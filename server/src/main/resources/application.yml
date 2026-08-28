@@ -1,0 +1,37 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: tft-tourneyos-server
+  datasource:
+    url: jdbc:sqlite:data/yunding.db
+    driver-class-name: org.sqlite.JDBC
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      continue-on-error: true
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: assign_uuid
+
+# Sa-Token 配置
+sa-token:
+  token-name: satoken
+  timeout: 2592000 # 30天
+  active-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-read-body: false
+  is-read-header: true
+  is-read-cookie: true
+  jwt-secret-key: tft-tourney-os-secret-key-2026-super-safe-jwt

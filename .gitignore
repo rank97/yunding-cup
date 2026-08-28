@@ -1,0 +1,34 @@
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDE & Editor
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Frontend
+client/node_modules/
+client/dist/
+client/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Backend (Java / Maven)
+server/target/
+*.class
+*.jar
+*.war
+
+# Database & Runtime Data
+server/data/*.db
+server/data/*.db-journal
+*.log
+
+# Temp files
+*.tmp
+*.bak

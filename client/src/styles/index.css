@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#0b0d1b] text-slate-100 min-h-[100dvh];
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(124, 58, 237, 0.12) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(251, 191, 36, 0.08) 0px, transparent 50%),
+      radial-gradient(at 50% 50%, rgba(6, 182, 212, 0.06) 0px, transparent 50%);
+  }
+}
+
+/* Custom Esports Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(11, 13, 27, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 58, 237, 0.35);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 58, 237, 0.6);
+}
+
+/* Glassmorphism Panel */
+.glass-panel {
+  background: rgba(23, 27, 48, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-gold {
+  background: linear-gradient(135deg, rgba(66, 32, 6, 0.85), rgba(23, 27, 48, 0.85));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  box-shadow: 0 0 25px rgba(251, 191, 36, 0.2), inset 0 1px 0 rgba(251, 191, 36, 0.3);
+}
+
+/* Cyber Button */
+.btn-primary {
+  @apply px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.35);
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5);
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0px) scale(0.98);
+}
+
+.btn-gold {
+  @apply px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 text-slate-900;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 4px 15px rgba(251, 191, 36, 0.4);
+}
+.btn-gold:hover {
+  background: linear-gradient(135deg, #fde047, #fbbf24);
+  box-shadow: 0 6px 25px rgba(251, 191, 36, 0.6);
+  transform: translateY(-1px);
+}
+.btn-gold:active {
+  transform: translateY(0px) scale(0.98);
+}
+
+.btn-secondary {
+  @apply px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 text-slate-300;
+  background: rgba(30, 36, 64, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+.btn-secondary:hover {
+  background: rgba(45, 55, 95, 0.9);
+  border-color: rgba(167, 139, 250, 0.4);
+  color: #fff;
+}
