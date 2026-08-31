@@ -16,4 +16,6 @@ public interface StageService {
     void clearGrouping(String stageId);
     void lockStage(String stageId);
     void unlockStage(String stageId);
+    void updatePlayerAdvancement(String stageId, String playerId, String advancementStatus);
+    void autoAssignAdvancement(String stageId);
 }

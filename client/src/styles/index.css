@@ -10,6 +10,18 @@
       radial-gradient(at 100% 100%, rgba(251, 191, 36, 0.08) 0px, transparent 50%),
       radial-gradient(at 50% 50%, rgba(6, 182, 212, 0.06) 0px, transparent 50%);
   }
+
+  /* 隐藏所有数字输入框 (type=number) 的原生上下微调箭头 Spinner */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }
 
 /* Custom Esports Scrollbar */

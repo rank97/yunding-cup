@@ -214,8 +214,41 @@ public class PublicServiceImpl implements PublicService {
         List<StagePlayerState> states = stagePlayerStateMapper.selectList(new LambdaQueryWrapper<StagePlayerState>()
                 .eq(StagePlayerState::getStageId, stageId));
 
-        // 排序规则: totalScore DESC > firstPlaceCount DESC > top4Count DESC > playerId ASC
+        boolean inherit = stage.getInheritScores() != null && stage.getInheritScores() == 1;
+        List<Stage> prevStages = stageMapper.selectList(new LambdaQueryWrapper<Stage>()
+                .eq(Stage::getTournamentId, stage.getTournamentId())
+                .lt(Stage::getStageOrder, stage.getStageOrder())
+                .orderByDesc(Stage::getStageOrder));
+
+        for (StagePlayerState s : states) {
+            int carryScore = 0;
+            if (inherit && !prevStages.isEmpty()) {
+                for (Stage ps : prevStages) {
+                    StagePlayerState prevState = stagePlayerStateMapper.selectOne(new LambdaQueryWrapper<StagePlayerState>()
+                            .eq(StagePlayerState::getStageId, ps.getId())
+                            .eq(StagePlayerState::getPlayerId, s.getPlayerId()));
+                    if (prevState != null && prevState.getTotalScore() != null) {
+                        carryScore = prevState.getTotalScore();
+                        break;
+                    }
+                }
+            }
+            s.setCarryOverScore(carryScore);
+            int stageScore = s.getStageScore() != null ? s.getStageScore() : 0;
+            s.setTotalScore(carryScore + stageScore);
+            if ("CHECKPOINT_FINAL".equalsIgnoreCase(stage.getStageType())) {
+                s.setIsMatchPoint((carryScore + stageScore) >= 20 ? 1 : 0);
+            }
+        }
+
+        // 排序规则: 如果是决赛且有冠军产生，冠军恒排第 1；其余按 totalScore DESC > firstPlaceCount DESC > top4Count DESC > playerId ASC
         states.sort((a, b) -> {
+            if ("CHECKPOINT_FINAL".equalsIgnoreCase(stage.getStageType())) {
+                boolean aChamp = Constants.ADVANCE_CHAMPION.equals(a.getAdvancementStatus());
+                boolean bChamp = Constants.ADVANCE_CHAMPION.equals(b.getAdvancementStatus());
+                if (aChamp && !bChamp) return -1;
+                if (!aChamp && bChamp) return 1;
+            }
             if (!b.getTotalScore().equals(a.getTotalScore())) return b.getTotalScore().compareTo(a.getTotalScore());
             if (!b.getFirstPlaceCount().equals(a.getFirstPlaceCount())) return b.getFirstPlaceCount().compareTo(a.getFirstPlaceCount());
             if (!b.getTop4Count().equals(a.getTop4Count())) return b.getTop4Count().compareTo(a.getTop4Count());

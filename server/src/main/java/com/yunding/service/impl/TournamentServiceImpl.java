@@ -17,9 +17,12 @@ import com.yunding.dto.TournamentUpdateDTO;
 import com.yunding.mapper.GameRecordMapper;
 import com.yunding.mapper.MatchRoundMapper;
 import com.yunding.mapper.StageGroupMapper;
+import com.yunding.mapper.UserMapper;
 import com.yunding.entity.StageGroup;
 import com.yunding.entity.MatchRound;
 import com.yunding.entity.GameRecord;
+import com.yunding.entity.User;
+import com.yunding.service.MatchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +40,8 @@ public class TournamentServiceImpl implements TournamentService {
     private final StageGroupMapper stageGroupMapper;
     private final MatchRoundMapper matchRoundMapper;
     private final GameRecordMapper gameRecordMapper;
+    private final UserMapper userMapper;
+    private final MatchService matchService;
     private final SseEmitterManager sseEmitterManager;
 
     @Override
@@ -80,21 +85,25 @@ public class TournamentServiceImpl implements TournamentService {
             stage.setName(sDto.getName());
             stage.setStageOrder(i + 1);
             
-            // 如果是最后一个阶段，默认为 20分登顶决赛
-            if (i == stageDTOs.size() - 1) {
-                stage.setStageType("CHECKPOINT_FINAL");
+            boolean isFinal = (i == stageDTOs.size() - 1);
+            // 如果是最后一个阶段，固定为 20分登顶决赛，最高打满 8 局
+            if (isFinal) {
+                stage.setStageType(Constants.STAGE_TYPE_CHECKPOINT_FINAL);
+                stage.setRoundCount(8);
+                stage.setMaxRoundLimit(8);
                 stage.setDirectToFinalCount(0);
                 stage.setEliminateCount(0);
             } else {
-                stage.setStageType(sDto.getStageType() != null ? sDto.getStageType() : "STANDARD");
+                stage.setStageType(sDto.getStageType() != null ? sDto.getStageType() : Constants.STAGE_TYPE_STANDARD);
+                stage.setRoundCount(sDto.getRoundCount() != null ? sDto.getRoundCount() : 3);
+                stage.setMaxRoundLimit(null);
                 stage.setDirectToFinalCount(sDto.getDirectToFinalCount() != null ? sDto.getDirectToFinalCount() : 0);
                 stage.setEliminateCount(sDto.getEliminateCount() != null ? sDto.getEliminateCount() : 0);
             }
 
-            stage.setRoundCount(sDto.getRoundCount() != null ? sDto.getRoundCount() : 3);
             // 第一赛段没有前置底分，恒为 0
             stage.setInheritScores(i == 0 ? 0 : (sDto.getInheritScores() != null ? sDto.getInheritScores() : 0));
-            stage.setMaxRoundLimit(sDto.getMaxRoundLimit());
+            stage.setMaxRoundLimit(isFinal ? Integer.valueOf(8) : sDto.getMaxRoundLimit());
             stage.setScoreRuleId(sDto.getScoreRuleId() != null ? sDto.getScoreRuleId() : defaultRuleId);
             stage.setStatus(Constants.STAGE_PENDING);
             stage.setIsDeleted(0);
@@ -123,7 +132,19 @@ public class TournamentServiceImpl implements TournamentService {
             wrapper.eq(Tournament::getTenantId, tenantId);
         }
 
-        return tournamentMapper.selectList(wrapper);
+        List<Tournament> list = tournamentMapper.selectList(wrapper);
+        if (!list.isEmpty()) {
+            Set<String> tenantIds = list.stream()
+                    .map(Tournament::getTenantId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!tenantIds.isEmpty()) {
+                Map<String, String> userMap = userMapper.selectBatchIds(tenantIds).stream()
+                        .collect(Collectors.toMap(User::getId, User::getUsername, (a, b) -> a));
+                list.forEach(t -> t.setCreatorName(userMap.getOrDefault(t.getTenantId(), "未知主办方")));
+            }
+        }
+        return list;
     }
 
     @Override
@@ -175,9 +196,22 @@ public class TournamentServiceImpl implements TournamentService {
             for (int i = 0; i < dto.getStages().size(); i++) {
                 TournamentUpdateDTO.StageUpdateItemDTO uStage = dto.getStages().get(i);
                 Stage eStage = existingStages.get(i);
+                boolean isFinal = (i == existingStages.size() - 1);
 
-                // 如果赛段已锁定完赛，跳过晋级规则变更，仅允许修改名称与局数
-                if (Constants.STAGE_LOCKED.equals(eStage.getStatus())) {
+                // 检查当前赛段是否已有分组或已锁定
+                List<StageGroup> groups = stageGroupMapper.selectList(new LambdaQueryWrapper<StageGroup>()
+                        .eq(StageGroup::getStageId, eStage.getId()));
+                boolean hasGrouping = !groups.isEmpty() || !Constants.STAGE_PENDING.equals(eStage.getStatus());
+
+                if (hasGrouping) {
+                    // 已有分组信息：严禁修改局数、直通、淘汰、底分等规则（仅允许修改阶段名称）
+                    boolean rulesChanged = (!isFinal && uStage.getRoundCount() != null && !uStage.getRoundCount().equals(eStage.getRoundCount()))
+                            || (uStage.getDirectToFinalCount() != null && !uStage.getDirectToFinalCount().equals(eStage.getDirectToFinalCount()))
+                            || (uStage.getEliminateCount() != null && !uStage.getEliminateCount().equals(eStage.getEliminateCount()))
+                            || (uStage.getInheritScores() != null && !uStage.getInheritScores().equals(eStage.getInheritScores()));
+                    if (rulesChanged) {
+                        throw new BizException(String.format("赛段 [%s] 已生成分组信息，严禁修改赛段规则与局数！如需修改请先在工作台点击【清除分组】。", eStage.getName()));
+                    }
                     if (uStage.getName() != null) {
                         eStage.setName(uStage.getName());
                         stageMapper.updateById(eStage);
@@ -185,39 +219,26 @@ public class TournamentServiceImpl implements TournamentService {
                     continue;
                 }
 
-                // 检查当前赛段是否已有打完录入的成绩
-                List<StageGroup> groups = stageGroupMapper.selectList(new LambdaQueryWrapper<StageGroup>()
-                        .eq(StageGroup::getStageId, eStage.getId()));
-                boolean hasScores = false;
-                if (!groups.isEmpty()) {
-                    List<String> groupIds = groups.stream().map(StageGroup::getId).collect(Collectors.toList());
-                    List<MatchRound> rounds = matchRoundMapper.selectList(new LambdaQueryWrapper<MatchRound>()
-                            .in(MatchRound::getStageGroupId, groupIds));
-                    if (!rounds.isEmpty()) {
-                        List<String> roundIds = rounds.stream().map(MatchRound::getId).collect(Collectors.toList());
-                        Long recordCount = gameRecordMapper.selectCount(new LambdaQueryWrapper<GameRecord>()
-                                .in(GameRecord::getMatchRoundId, roundIds));
-                        if (recordCount > 0) {
-                            hasScores = true;
-                        }
-                    }
-                }
-
-                if (hasScores) {
-                    // 已产生积分，仅允许改名称
-                    if (uStage.getName() != null) eStage.setName(uStage.getName());
-                    stageMapper.updateById(eStage);
-                    continue;
-                }
-
-                // 未产生积分的赛段（如24人已入名单但未开赛）：允许全面修改直通、淘汰、局数与底分
+                // 未分组的赛段：允许全面修改
                 if (uStage.getName() != null) eStage.setName(uStage.getName());
-                if (uStage.getRoundCount() != null) eStage.setRoundCount(uStage.getRoundCount());
-                if (uStage.getDirectToFinalCount() != null) eStage.setDirectToFinalCount(uStage.getDirectToFinalCount());
-                if (uStage.getEliminateCount() != null) eStage.setEliminateCount(uStage.getEliminateCount());
+                if (isFinal) {
+                    eStage.setRoundCount(8);
+                    eStage.setMaxRoundLimit(8);
+                    eStage.setDirectToFinalCount(0);
+                    eStage.setEliminateCount(0);
+                    eStage.setStageType(Constants.STAGE_TYPE_CHECKPOINT_FINAL);
+                } else {
+                    if (uStage.getRoundCount() != null) eStage.setRoundCount(uStage.getRoundCount());
+                    if (uStage.getDirectToFinalCount() != null) eStage.setDirectToFinalCount(uStage.getDirectToFinalCount());
+                    if (uStage.getEliminateCount() != null) eStage.setEliminateCount(uStage.getEliminateCount());
+                }
                 eStage.setInheritScores(i == 0 ? 0 : (uStage.getInheritScores() != null ? uStage.getInheritScores() : 0));
                 eStage.setUpdatedAt(new Date());
                 stageMapper.updateById(eStage);
+            }
+
+            for (Stage s : existingStages) {
+                matchService.recalculateStageScores(s);
             }
         }
 
@@ -230,10 +251,14 @@ public class TournamentServiceImpl implements TournamentService {
     }
 
     @Override
-    public Map<String, Object> getTournamentDetail(String tournamentId, String tenantId) {
+    public Map<String, Object> getTournamentDetail(String tournamentId, String tenantId, String role) {
         Tournament tournament = tournamentMapper.selectById(tournamentId);
         if (tournament == null || tournament.getIsDeleted() == 1) {
             throw new BizException("赛事不存在");
+        }
+
+        if (!Constants.ROLE_SUPER_ADMIN.equals(role) && !tournament.getTenantId().equals(tenantId)) {
+            throw new BizException("无权查看他人创建的赛事管理后台");
         }
 
         List<Stage> stages = stageMapper.selectList(new LambdaQueryWrapper<Stage>()
@@ -249,10 +274,14 @@ public class TournamentServiceImpl implements TournamentService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateStages(String tournamentId, List<StageCreateDTO> stages, String tenantId) {
+    public void updateStages(String tournamentId, List<StageCreateDTO> stages, String tenantId, String role) {
         Tournament tournament = tournamentMapper.selectById(tournamentId);
         if (tournament == null || tournament.getIsDeleted() == 1) {
             throw new BizException("赛事不存在");
+        }
+
+        if (!Constants.ROLE_SUPER_ADMIN.equals(role) && !tournament.getTenantId().equals(tenantId)) {
+            throw new BizException("无权修改他人创建的赛事赛段");
         }
 
         // 校验是否允许修改：如果已有赛段不是 PENDING 状态则不允许修改整体赛程
@@ -293,13 +322,20 @@ public class TournamentServiceImpl implements TournamentService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void deleteTournament(String tournamentId, String tenantId) {
+    public void deleteTournament(String tournamentId, String tenantId, String role) {
         Tournament tournament = tournamentMapper.selectById(tournamentId);
-        if (tournament == null) {
+        if (tournament == null || tournament.getIsDeleted() == 1) {
             throw new BizException("赛事不存在");
         }
+
+        if (!Constants.ROLE_SUPER_ADMIN.equals(role) && !tournament.getTenantId().equals(tenantId)) {
+            throw new BizException("无权删除他人创建的赛事");
+        }
+
         tournament.setIsDeleted(1);
         tournamentMapper.updateById(tournament);
+
+        sseEmitterManager.broadcast(tournament.getShareCode(), "TOURNAMENT_DELETED", Map.of("tournamentId", tournamentId));
     }
 
     private void validateStagesClosure(int totalPlayers, List<StageCreateDTO> stages) {
@@ -311,6 +347,11 @@ public class TournamentServiceImpl implements TournamentService {
             boolean isFinal = (i == stages.size() - 1);
 
             if (isFinal) {
+                stage.setStageType(Constants.STAGE_TYPE_CHECKPOINT_FINAL);
+                stage.setRoundCount(8);
+                stage.setDirectToFinalCount(0);
+                stage.setEliminateCount(0);
+
                 // 最后一阶段必须恰好汇聚 8 人
                 if (directTotal + currentPlayers != 8) {
                     throw new BizException(String.format(

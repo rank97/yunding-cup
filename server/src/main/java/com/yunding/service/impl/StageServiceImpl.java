@@ -1,5 +1,6 @@
 package com.yunding.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yunding.common.BizException;
 import com.yunding.common.Constants;
@@ -29,9 +30,38 @@ public class StageServiceImpl implements StageService {
     private final StagePlayerStateMapper stagePlayerStateMapper;
     private final SseEmitterManager sseEmitterManager;
 
+    private void checkTournamentPermission(String tournamentId) {
+        String loginId = (String) StpUtil.getLoginIdDefaultNull();
+        if (loginId == null) return;
+        String role = (String) StpUtil.getSession().get("role");
+        if (Constants.ROLE_SUPER_ADMIN.equals(role)) return;
+
+        Tournament tournament = tournamentMapper.selectById(tournamentId);
+        if (tournament == null || tournament.getIsDeleted() == 1) {
+            throw new BizException("赛事不存在");
+        }
+        if (!tournament.getTenantId().equals(loginId)) {
+            throw new BizException("无权操作他人创建的赛事");
+        }
+    }
+
+    private void checkStagePermission(String stageId) {
+        String loginId = (String) StpUtil.getLoginIdDefaultNull();
+        if (loginId == null) return;
+        String role = (String) StpUtil.getSession().get("role");
+        if (Constants.ROLE_SUPER_ADMIN.equals(role)) return;
+
+        Stage stage = stageMapper.selectById(stageId);
+        if (stage == null || stage.getIsDeleted() == 1) {
+            throw new BizException("赛段不存在");
+        }
+        checkTournamentPermission(stage.getTournamentId());
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void importPlayers(PlayerBatchImportDTO dto) {
+        checkTournamentPermission(dto.getTournamentId());
         Tournament tournament = tournamentMapper.selectById(dto.getTournamentId());
         if (tournament == null || tournament.getIsDeleted() == 1) {
             throw new BizException("赛事不存在");
@@ -104,6 +134,7 @@ public class StageServiceImpl implements StageService {
         if (p == null) {
             throw new BizException("选手不存在");
         }
+        checkTournamentPermission(p.getTournamentId());
         if (name != null && !name.trim().isEmpty()) {
             p.setName(name.trim());
         }
@@ -147,6 +178,16 @@ public class StageServiceImpl implements StageService {
             Map<String, Object> gMap = new HashMap<>();
             gMap.put("group", g);
 
+            List<MatchRound> rounds = matchRoundMapper.selectList(new LambdaQueryWrapper<MatchRound>()
+                    .eq(MatchRound::getStageGroupId, g.getId())
+                    .orderByAsc(MatchRound::getRoundNumber));
+            gMap.put("rounds", rounds);
+
+            List<String> roundIds = rounds.stream().map(MatchRound::getId).toList();
+            List<GameRecord> groupRecords = roundIds.isEmpty() ? Collections.emptyList() :
+                    gameRecordMapper.selectList(new LambdaQueryWrapper<GameRecord>().in(GameRecord::getMatchRoundId, roundIds));
+            Set<String> playedPlayerIds = groupRecords.stream().map(GameRecord::getPlayerId).collect(Collectors.toSet());
+
             List<StageGroupPlayer> groupPlayers = stageGroupPlayerMapper.selectList(new LambdaQueryWrapper<StageGroupPlayer>()
                     .eq(StageGroupPlayer::getStageGroupId, g.getId())
                     .orderByAsc(StageGroupPlayer::getSeedIndex));
@@ -157,14 +198,10 @@ public class StageServiceImpl implements StageService {
                 Map<String, Object> pMap = new HashMap<>();
                 pMap.put("player", p);
                 pMap.put("seedIndex", gp.getSeedIndex());
+                pMap.put("hasPlayed", playedPlayerIds.contains(gp.getPlayerId()));
                 players.add(pMap);
             }
             gMap.put("players", players);
-
-            List<MatchRound> rounds = matchRoundMapper.selectList(new LambdaQueryWrapper<MatchRound>()
-                    .eq(MatchRound::getStageGroupId, g.getId())
-                    .orderByAsc(MatchRound::getRoundNumber));
-            gMap.put("rounds", rounds);
 
             groupDetails.add(gMap);
         }
@@ -178,6 +215,7 @@ public class StageServiceImpl implements StageService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void executeGrouping(String stageId, String mode) {
+        checkStagePermission(stageId);
         Stage stage = stageMapper.selectById(stageId);
         if (stage == null || stage.getIsDeleted() == 1) {
             throw new BizException("赛段不存在");
@@ -307,6 +345,7 @@ public class StageServiceImpl implements StageService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void swapPlayers(String stageId, String player1Id, String player2Id) {
+        checkStagePermission(stageId);
         Stage stage = stageMapper.selectById(stageId);
         if (stage == null || stage.getIsDeleted() == 1) {
             throw new BizException("赛段不存在");
@@ -316,26 +355,38 @@ public class StageServiceImpl implements StageService {
             throw new BizException("已锁定的赛段不能微调换人");
         }
 
-        if (player1Id.equals(player2Id)) {
-            throw new BizException("互换的两位选手不能为同一人");
-        }
-
-        // 检查本赛段是否已有单局录入比分（必须满足积分为0未开赛）
         List<StageGroup> existingGroups = stageGroupMapper.selectList(new LambdaQueryWrapper<StageGroup>()
                 .eq(StageGroup::getStageId, stageId));
         if (existingGroups.isEmpty()) {
             throw new BizException("当前赛段尚未执行分组，无法微调换人");
         }
+        if (player1Id.equals(player2Id)) {
+            throw new BizException("互换的两位选手不能为同一人");
+        }
 
+        // 精准校验：只有两位选手在当前赛段均未打过任何对局（无任何单局战绩 GameRecord），才允许互换组别
         List<String> groupIds = existingGroups.stream().map(StageGroup::getId).collect(Collectors.toList());
         List<MatchRound> rounds = matchRoundMapper.selectList(new LambdaQueryWrapper<MatchRound>()
                 .in(MatchRound::getStageGroupId, groupIds));
         if (!rounds.isEmpty()) {
             List<String> roundIds = rounds.stream().map(MatchRound::getId).collect(Collectors.toList());
-            Long recordCount = gameRecordMapper.selectCount(new LambdaQueryWrapper<GameRecord>()
-                    .in(GameRecord::getMatchRoundId, roundIds));
-            if (recordCount > 0) {
-                throw new BizException("当前赛段已有对局打完并产生积分，严禁微调互换选手！");
+            
+            Long p1RecordCount = gameRecordMapper.selectCount(new LambdaQueryWrapper<GameRecord>()
+                    .in(GameRecord::getMatchRoundId, roundIds)
+                    .eq(GameRecord::getPlayerId, player1Id));
+            if (p1RecordCount > 0) {
+                Player p1 = playerMapper.selectById(player1Id);
+                String p1Name = p1 != null ? p1.getName() : "选手1";
+                throw new BizException(String.format("选手 [%s] 在当前赛段已有对局记录，无法进行微调换人！", p1Name));
+            }
+
+            Long p2RecordCount = gameRecordMapper.selectCount(new LambdaQueryWrapper<GameRecord>()
+                    .in(GameRecord::getMatchRoundId, roundIds)
+                    .eq(GameRecord::getPlayerId, player2Id));
+            if (p2RecordCount > 0) {
+                Player p2 = playerMapper.selectById(player2Id);
+                String p2Name = p2 != null ? p2.getName() : "选手2";
+                throw new BizException(String.format("选手 [%s] 在当前赛段已有对局记录，无法进行微调换人！", p2Name));
             }
         }
 
@@ -374,6 +425,7 @@ public class StageServiceImpl implements StageService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void lockStage(String stageId) {
+        checkStagePermission(stageId);
         Stage stage = stageMapper.selectById(stageId);
         if (stage == null || stage.getIsDeleted() == 1) {
             throw new BizException("赛段不存在");
@@ -386,12 +438,18 @@ public class StageServiceImpl implements StageService {
             throw new BizException("赛段尚未分组开赛");
         }
 
-        for (StageGroup g : groups) {
-            List<MatchRound> rounds = matchRoundMapper.selectList(new LambdaQueryWrapper<MatchRound>()
-                    .eq(MatchRound::getStageGroupId, g.getId()));
-            for (MatchRound r : rounds) {
-                if (!Constants.ROUND_FINISHED.equals(r.getStatus())) {
-                    throw new BizException(String.format("[%s] 第 %d 局尚未完赛录入成绩，无法锁定赛段", g.getGroupName(), r.getRoundNumber()));
+        boolean isFinal = Constants.STAGE_TYPE_CHECKPOINT_FINAL.equalsIgnoreCase(stage.getStageType());
+        String checkmateWinnerId = isFinal ? findCheckmateWinnerId(stage) : null;
+
+        // 如果不是20分登顶提前夺冠，则强校验是否全部小局打完
+        if (checkmateWinnerId == null) {
+            for (StageGroup g : groups) {
+                List<MatchRound> rounds = matchRoundMapper.selectList(new LambdaQueryWrapper<MatchRound>()
+                        .eq(MatchRound::getStageGroupId, g.getId()));
+                for (MatchRound r : rounds) {
+                    if (!Constants.ROUND_FINISHED.equals(r.getStatus())) {
+                        throw new BizException(String.format("[%s] 第 %d 局尚未完赛录入成绩，无法锁定赛段", g.getGroupName(), r.getRoundNumber()));
+                    }
                 }
             }
         }
@@ -412,27 +470,53 @@ public class StageServiceImpl implements StageService {
         int elimCount = stage.getEliminateCount() != null ? stage.getEliminateCount() : 0;
         int advanceCount = totalCount - directCount - elimCount;
 
-        // 标记晋级/直通/淘汰状态
-        for (int i = 0; i < totalCount; i++) {
-            StagePlayerState s = states.get(i);
-            s.setFinalRank(i + 1);
-
-            if ("CHECKPOINT_FINAL".equalsIgnoreCase(stage.getStageType())) {
-                if (i == 0) {
-                    s.setAdvancementStatus(Constants.ADVANCE_CHAMPION);
-                } else {
-                    s.setAdvancementStatus(Constants.ADVANCE_NONE);
+        // 检查当前状态分配是否满足赛段规则
+        if (isFinal) {
+            // 决赛必须产生且仅产生 1 名冠军
+            long champCount = states.stream().filter(s -> Constants.ADVANCE_CHAMPION.equals(s.getAdvancementStatus())).count();
+            if (champCount == 0) {
+                states.get(0).setAdvancementStatus(Constants.ADVANCE_CHAMPION);
+                stagePlayerStateMapper.updateById(states.get(0));
+            }
+        } else {
+            boolean allNone = states.stream().allMatch(s -> s.getAdvancementStatus() == null || Constants.ADVANCE_NONE.equals(s.getAdvancementStatus()));
+            if (allNone) {
+                // 如果用户未手动指定过任何状态，自动按当前名次赋默认状态
+                for (int i = 0; i < totalCount; i++) {
+                    StagePlayerState s = states.get(i);
+                    s.setFinalRank(i + 1);
+                    if (i < directCount) {
+                        s.setAdvancementStatus(Constants.ADVANCE_DIRECT_FINAL);
+                    } else if (i < directCount + advanceCount) {
+                        s.setAdvancementStatus(Constants.ADVANCE_QUALIFIED);
+                    } else {
+                        s.setAdvancementStatus(Constants.ADVANCE_ELIMINATED);
+                    }
+                    stagePlayerStateMapper.updateById(s);
                 }
             } else {
-                if (i < directCount) {
-                    s.setAdvancementStatus(Constants.ADVANCE_DIRECT_FINAL);
-                } else if (i < directCount + advanceCount) {
-                    s.setAdvancementStatus(Constants.ADVANCE_QUALIFIED);
-                } else {
-                    s.setAdvancementStatus(Constants.ADVANCE_ELIMINATED);
+                // 校验手动设置的状态是否严格满足规则设定
+                long actualDirect = states.stream().filter(s -> Constants.ADVANCE_DIRECT_FINAL.equals(s.getAdvancementStatus())).count();
+                long actualAdvance = states.stream().filter(s -> Constants.ADVANCE_QUALIFIED.equals(s.getAdvancementStatus())).count();
+                long actualElim = states.stream().filter(s -> Constants.ADVANCE_ELIMINATED.equals(s.getAdvancementStatus())).count();
+                long actualNone = states.stream().filter(s -> s.getAdvancementStatus() == null || Constants.ADVANCE_NONE.equals(s.getAdvancementStatus())).count();
+
+                if (actualNone > 0) {
+                    throw new BizException(String.format("尚有 %d 位选手的晋级状态为【待定】，请为所有选手指定 晋级 / 直通 / 淘汰 状态！", actualNone));
+                }
+
+                if (actualDirect != directCount || actualAdvance != advanceCount || actualElim != elimCount) {
+                    throw new BizException(String.format("当前晋级状态人数不符合本赛段规则：\n• 直通决赛：%d 人（规则要求 %d 人）\n• 常规晋级：%d 人（规则要求 %d 人）\n• 淘汰出局：%d 人（规则要求 %d 人）\n请在积分榜调整选手状态使其完全符合规则后再锁定！",
+                            actualDirect, directCount, actualAdvance, advanceCount, actualElim, elimCount));
+                }
+
+                // 更新 finalRank
+                for (int i = 0; i < totalCount; i++) {
+                    StagePlayerState s = states.get(i);
+                    s.setFinalRank(i + 1);
+                    stagePlayerStateMapper.updateById(s);
                 }
             }
-            stagePlayerStateMapper.updateById(s);
         }
 
         stage.setStatus(Constants.STAGE_LOCKED);
@@ -466,29 +550,49 @@ public class StageServiceImpl implements StageService {
                 // 下一赛段是决赛：收集所有前面赛段直通的选手 + 本赛段常规晋级选手（共8人）
                 List<String> finalPlayerIds = new ArrayList<>();
                 
-                // 1. 查找历史所有直通选手
+                // 1. 查找历史所有直通选手 (ADVANCE_DIRECT_FINAL)
                 for (int i = 0; i <= currentIndex; i++) {
                     Stage prevStage = allStages.get(i);
                     List<StagePlayerState> directs = stagePlayerStateMapper.selectList(new LambdaQueryWrapper<StagePlayerState>()
                             .eq(StagePlayerState::getStageId, prevStage.getId())
                             .eq(StagePlayerState::getAdvancementStatus, Constants.ADVANCE_DIRECT_FINAL));
                     for (StagePlayerState d : directs) {
-                        finalPlayerIds.add(d.getPlayerId());
+                        if (!finalPlayerIds.contains(d.getPlayerId())) {
+                            finalPlayerIds.add(d.getPlayerId());
+                        }
                     }
                 }
 
-                // 2. 本赛段常规晋级选手
-                for (int i = directCount; i < directCount + advanceCount; i++) {
-                    finalPlayerIds.add(states.get(i).getPlayerId());
+                // 2. 本赛段常规晋级选手 (ADVANCE_QUALIFIED)
+                List<StagePlayerState> qualifiedStates = stagePlayerStateMapper.selectList(new LambdaQueryWrapper<StagePlayerState>()
+                        .eq(StagePlayerState::getStageId, stageId)
+                        .eq(StagePlayerState::getAdvancementStatus, Constants.ADVANCE_QUALIFIED));
+                for (StagePlayerState q : qualifiedStates) {
+                    if (!finalPlayerIds.contains(q.getPlayerId())) {
+                        finalPlayerIds.add(q.getPlayerId());
+                    }
                 }
 
+                boolean inherit = nextStage.getInheritScores() != null && nextStage.getInheritScores() == 1;
                 for (String pid : finalPlayerIds) {
                     StagePlayerState nextState = new StagePlayerState();
                     nextState.setStageId(nextStage.getId());
                     nextState.setPlayerId(pid);
-                    nextState.setCarryOverScore(0);
+                    int carryScore = 0;
+                    if (inherit) {
+                        List<StagePlayerState> prevStates = stagePlayerStateMapper.selectList(new LambdaQueryWrapper<StagePlayerState>()
+                                .eq(StagePlayerState::getPlayerId, pid)
+                                .ne(StagePlayerState::getStageId, nextStage.getId()));
+                        if (!prevStates.isEmpty()) {
+                            StagePlayerState lastState = prevStates.get(prevStates.size() - 1);
+                            if (lastState.getTotalScore() != null) {
+                                carryScore = lastState.getTotalScore();
+                            }
+                        }
+                    }
+                    nextState.setCarryOverScore(carryScore);
                     nextState.setStageScore(0);
-                    nextState.setTotalScore(0);
+                    nextState.setTotalScore(carryScore);
                     nextState.setFirstPlaceCount(0);
                     nextState.setTop4Count(0);
                     nextState.setAdvancementStatus(Constants.ADVANCE_NONE);
@@ -496,14 +600,17 @@ public class StageServiceImpl implements StageService {
                     stagePlayerStateMapper.insert(nextState);
                 }
             } else {
-                // 下一赛段是常规赛段：导入本赛段常规晋级选手
+                // 下一赛段是常规赛段：导入本赛段常规晋级选手 (ADVANCE_QUALIFIED)
                 boolean inherit = nextStage.getInheritScores() != null && nextStage.getInheritScores() == 1;
-                for (int i = directCount; i < directCount + advanceCount; i++) {
-                    StagePlayerState prev = states.get(i);
+                List<StagePlayerState> qualifiedStates = stagePlayerStateMapper.selectList(new LambdaQueryWrapper<StagePlayerState>()
+                        .eq(StagePlayerState::getStageId, stageId)
+                        .eq(StagePlayerState::getAdvancementStatus, Constants.ADVANCE_QUALIFIED));
+
+                for (StagePlayerState prev : qualifiedStates) {
                     StagePlayerState nextState = new StagePlayerState();
                     nextState.setStageId(nextStage.getId());
                     nextState.setPlayerId(prev.getPlayerId());
-                    int carryScore = inherit ? prev.getTotalScore() : 0;
+                    int carryScore = inherit ? (prev.getTotalScore() != null ? prev.getTotalScore() : 0) : 0;
                     nextState.setCarryOverScore(carryScore);
                     nextState.setStageScore(0);
                     nextState.setTotalScore(carryScore);
@@ -526,9 +633,185 @@ public class StageServiceImpl implements StageService {
         sseEmitterManager.broadcast(tournament.getShareCode(), "STAGE_LOCKED", Map.of("stageId", stageId));
     }
 
+    private String findCheckmateWinnerId(Stage stage) {
+        if (!Constants.STAGE_TYPE_CHECKPOINT_FINAL.equalsIgnoreCase(stage.getStageType())) {
+            return null;
+        }
+
+        List<StageGroup> groups = stageGroupMapper.selectList(new LambdaQueryWrapper<StageGroup>()
+                .eq(StageGroup::getStageId, stage.getId()));
+        if (groups.isEmpty()) return null;
+
+        List<String> groupIds = groups.stream().map(StageGroup::getId).toList();
+        List<MatchRound> allRounds = matchRoundMapper.selectList(new LambdaQueryWrapper<MatchRound>()
+                .in(MatchRound::getStageGroupId, groupIds)
+                .orderByAsc(MatchRound::getRoundNumber));
+
+        List<MatchRound> finishedRounds = allRounds.stream()
+                .filter(r -> Constants.ROUND_FINISHED.equals(r.getStatus()))
+                .toList();
+        if (finishedRounds.isEmpty()) return null;
+
+        List<StagePlayerState> states = stagePlayerStateMapper.selectList(new LambdaQueryWrapper<StagePlayerState>()
+                .eq(StagePlayerState::getStageId, stage.getId()));
+
+        Map<String, Integer> runningScores = new HashMap<>();
+        for (StagePlayerState state : states) {
+            runningScores.put(state.getPlayerId(), state.getCarryOverScore() != null ? state.getCarryOverScore() : 0);
+        }
+
+        for (MatchRound mr : finishedRounds) {
+            List<GameRecord> rRecords = gameRecordMapper.selectList(new LambdaQueryWrapper<GameRecord>()
+                    .eq(GameRecord::getMatchRoundId, mr.getId()));
+
+            for (GameRecord gr : rRecords) {
+                int scoreBeforeThisRound = runningScores.getOrDefault(gr.getPlayerId(), 0);
+                if (gr.getRank() == 1 && scoreBeforeThisRound >= 20) {
+                    return gr.getPlayerId();
+                }
+            }
+
+            for (GameRecord gr : rRecords) {
+                runningScores.put(gr.getPlayerId(), runningScores.getOrDefault(gr.getPlayerId(), 0) + gr.getScore());
+            }
+        }
+
+        return null;
+    }
+
+    private void checkAllRoundsFinished(String stageId) {
+        Stage stage = stageMapper.selectById(stageId);
+        if (stage == null) return;
+
+        boolean isFinal = Constants.STAGE_TYPE_CHECKPOINT_FINAL.equalsIgnoreCase(stage.getStageType());
+        if (isFinal) {
+            String checkmateWinnerId = findCheckmateWinnerId(stage);
+            if (checkmateWinnerId != null) {
+                // 已有选手达成 20分+吃鸡 登顶夺冠，总决赛提前完赛！
+                return;
+            }
+        }
+
+        List<StageGroup> groups = stageGroupMapper.selectList(new LambdaQueryWrapper<StageGroup>()
+                .eq(StageGroup::getStageId, stageId));
+        if (groups.isEmpty()) {
+            throw new BizException("赛段尚未分组开赛，无法进行排名状态分配");
+        }
+
+        List<String> groupIds = groups.stream().map(StageGroup::getId).toList();
+        List<MatchRound> allRounds = matchRoundMapper.selectList(new LambdaQueryWrapper<MatchRound>()
+                .in(MatchRound::getStageGroupId, groupIds));
+        if (allRounds.isEmpty()) {
+            throw new BizException("赛段未生成对局，无法进行排名状态分配");
+        }
+
+        for (MatchRound r : allRounds) {
+            if (!Constants.ROUND_FINISHED.equals(r.getStatus())) {
+                throw new BizException("当前阶段尚有对局未完赛，只有在所有对局全部打完（或决赛产生20分登顶冠军）后，才能进行排名与晋级状态分配！");
+            }
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePlayerAdvancement(String stageId, String playerId, String advancementStatus) {
+        checkStagePermission(stageId);
+        checkAllRoundsFinished(stageId);
+        Stage stage = stageMapper.selectById(stageId);
+        if (stage == null || stage.getIsDeleted() == 1) {
+            throw new BizException("赛段不存在");
+        }
+        if (Constants.STAGE_LOCKED.equals(stage.getStatus())) {
+            throw new BizException("已锁定的赛段不能修改选手晋级状态，请先解锁赛段");
+        }
+
+        StagePlayerState state = stagePlayerStateMapper.selectOne(new LambdaQueryWrapper<StagePlayerState>()
+                .eq(StagePlayerState::getStageId, stageId)
+                .eq(StagePlayerState::getPlayerId, playerId));
+        if (state == null) {
+            throw new BizException("未找到该选手的赛段状态记录");
+        }
+
+        List<String> validStatuses = List.of(
+                Constants.ADVANCE_NONE,
+                Constants.ADVANCE_QUALIFIED,
+                Constants.ADVANCE_DIRECT_FINAL,
+                Constants.ADVANCE_ELIMINATED,
+                Constants.ADVANCE_CHAMPION
+        );
+        if (advancementStatus != null && !validStatuses.contains(advancementStatus)) {
+            throw new BizException("不合法的晋级状态: " + advancementStatus);
+        }
+
+        state.setAdvancementStatus(advancementStatus != null ? advancementStatus : Constants.ADVANCE_NONE);
+        stagePlayerStateMapper.updateById(state);
+
+        Tournament tournament = tournamentMapper.selectById(stage.getTournamentId());
+        if (tournament != null) {
+            sseEmitterManager.broadcast(tournament.getShareCode(), "STAGE_UPDATED", Map.of("stageId", stageId));
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void autoAssignAdvancement(String stageId) {
+        checkStagePermission(stageId);
+        checkAllRoundsFinished(stageId);
+        Stage stage = stageMapper.selectById(stageId);
+        if (stage == null || stage.getIsDeleted() == 1) {
+            throw new BizException("赛段不存在");
+        }
+        if (Constants.STAGE_LOCKED.equals(stage.getStatus())) {
+            throw new BizException("已锁定的赛段不能重新分配状态");
+        }
+
+        List<StagePlayerState> states = stagePlayerStateMapper.selectList(new LambdaQueryWrapper<StagePlayerState>()
+                .eq(StagePlayerState::getStageId, stageId));
+
+        states.sort((a, b) -> {
+            if (!b.getTotalScore().equals(a.getTotalScore())) return b.getTotalScore().compareTo(a.getTotalScore());
+            if (!b.getFirstPlaceCount().equals(a.getFirstPlaceCount())) return b.getFirstPlaceCount().compareTo(a.getFirstPlaceCount());
+            if (!b.getTop4Count().equals(a.getTop4Count())) return b.getTop4Count().compareTo(a.getTop4Count());
+            return a.getPlayerId().compareTo(b.getPlayerId());
+        });
+
+        int totalCount = states.size();
+        int directCount = stage.getDirectToFinalCount() != null ? stage.getDirectToFinalCount() : 0;
+        int elimCount = stage.getEliminateCount() != null ? stage.getEliminateCount() : 0;
+        int advanceCount = totalCount - directCount - elimCount;
+        boolean isFinal = "CHECKPOINT_FINAL".equalsIgnoreCase(stage.getStageType());
+
+        for (int i = 0; i < totalCount; i++) {
+            StagePlayerState s = states.get(i);
+            s.setFinalRank(i + 1);
+            if (isFinal) {
+                if (i == 0) {
+                    s.setAdvancementStatus(Constants.ADVANCE_CHAMPION);
+                } else {
+                    s.setAdvancementStatus(Constants.ADVANCE_NONE);
+                }
+            } else {
+                if (i < directCount) {
+                    s.setAdvancementStatus(Constants.ADVANCE_DIRECT_FINAL);
+                } else if (i < directCount + advanceCount) {
+                    s.setAdvancementStatus(Constants.ADVANCE_QUALIFIED);
+                } else {
+                    s.setAdvancementStatus(Constants.ADVANCE_ELIMINATED);
+                }
+            }
+            stagePlayerStateMapper.updateById(s);
+        }
+
+        Tournament tournament = tournamentMapper.selectById(stage.getTournamentId());
+        if (tournament != null) {
+            sseEmitterManager.broadcast(tournament.getShareCode(), "STAGE_UPDATED", Map.of("stageId", stageId));
+        }
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void clearGrouping(String stageId) {
+        checkStagePermission(stageId);
         Stage stage = stageMapper.selectById(stageId);
         if (stage == null || stage.getIsDeleted() == 1) {
             throw new BizException("赛段不存在");
@@ -574,6 +857,7 @@ public class StageServiceImpl implements StageService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void unlockStage(String stageId) {
+        checkStagePermission(stageId);
         Stage stage = stageMapper.selectById(stageId);
         if (stage == null || stage.getIsDeleted() == 1) {
             throw new BizException("赛段不存在");

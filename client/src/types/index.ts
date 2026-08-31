@@ -16,6 +16,7 @@ export interface ScoreRule {
 export interface Tournament {
   id: string;
   tenantId: string;
+  creatorName?: string;
   title: string;
   totalPlayers: number;
   shareCode: string;

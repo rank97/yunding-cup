@@ -12,7 +12,7 @@ public interface TournamentService {
     Tournament createTournament(TournamentCreateDTO dto, String tenantId);
     Tournament updateTournament(String tournamentId, TournamentUpdateDTO dto, String tenantId, String role);
     List<Tournament> listTournaments(String tenantId, String role);
-    Map<String, Object> getTournamentDetail(String tournamentId, String tenantId);
-    void updateStages(String tournamentId, List<StageCreateDTO> stages, String tenantId);
-    void deleteTournament(String tournamentId, String tenantId);
+    Map<String, Object> getTournamentDetail(String tournamentId, String tenantId, String role);
+    void updateStages(String tournamentId, List<StageCreateDTO> stages, String tenantId, String role);
+    void deleteTournament(String tournamentId, String tenantId, String role);
 }

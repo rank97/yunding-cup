@@ -20,7 +20,7 @@ interface SpectatorDashboardProps {
 
 export const SpectatorDashboard: React.FC<SpectatorDashboardProps> = ({ shareCode }) => {
   const initialNav = getUrlNavState();
-  const [activeTab, setActiveTab] = useState<'mindmap' | 'details'>(initialNav.tab || 'mindmap');
+  const [activeTab, setActiveTab] = useState<'mindmap' | 'details'>('mindmap');
   const [overview, setOverview] = useState<TournamentOverview | null>(null);
   const [activeStageId, setActiveStageId] = useState<string>(initialNav.stage || '');
   const [leaderboard, setLeaderboard] = useState<StageLeaderboard | null>(null);
@@ -35,8 +35,14 @@ export const SpectatorDashboard: React.FC<SpectatorDashboardProps> = ({ shareCod
       setOverview(data);
 
       const nav = getUrlNavState();
-      let targetStageId = nav.stage;
-      if (!targetStageId || !data.columns.some((c) => c.stageId === targetStageId)) {
+      let targetStageId = '';
+      if (nav.stage) {
+        const byOrder = data.columns.find((c) => String(c.stageOrder) === nav.stage || (nav.stage === 'final' && c.stageType === 'CHECKPOINT_FINAL'));
+        const byId = data.columns.find((c) => c.stageId === nav.stage);
+        if (byOrder) targetStageId = byOrder.stageId;
+        else if (byId) targetStageId = byId.stageId;
+      }
+      if (!targetStageId) {
         const currentCol = data.columns.find((c) => c.stageId === data.currentStageId) || data.columns[0];
         targetStageId = currentCol?.stageId || '';
       }
@@ -70,9 +76,11 @@ export const SpectatorDashboard: React.FC<SpectatorDashboardProps> = ({ shareCod
   useEffect(() => {
     if (activeStageId) {
       fetchStageData(activeStageId);
-      updateUrlNavState({ tab: activeTab, stage: activeStageId });
+      const col = overview?.columns.find((c) => c.stageId === activeStageId);
+      const stageParam = col ? String(col.stageOrder) : activeStageId;
+      updateUrlNavState({ stage: stageParam });
     }
-  }, [activeStageId, activeTab, fetchStageData]);
+  }, [activeStageId, overview, fetchStageData]);
 
   // 建立 SSE 实时推流监听
   useEffect(() => {

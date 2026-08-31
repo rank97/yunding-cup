@@ -85,4 +85,19 @@ public class StageController {
         stageService.unlockStage(stageId);
         return Result.success();
     }
+
+    @PutMapping("/stages/{stageId}/players/{playerId}/advancement")
+    @SaCheckLogin
+    public Result<?> updatePlayerAdvancement(@PathVariable String stageId, @PathVariable String playerId, @RequestBody Map<String, String> body) {
+        String status = body.get("advancementStatus");
+        stageService.updatePlayerAdvancement(stageId, playerId, status);
+        return Result.success();
+    }
+
+    @PostMapping("/stages/{stageId}/advancement/auto-assign")
+    @SaCheckLogin
+    public Result<?> autoAssignAdvancement(@PathVariable String stageId) {
+        stageService.autoAssignAdvancement(stageId);
+        return Result.success();
+    }
 }

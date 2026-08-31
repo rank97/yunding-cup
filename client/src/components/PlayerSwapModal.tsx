@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ArrowLeftRight, Users, Check, AlertCircle, ShieldAlert, RefreshCw } from 'lucide-react';
+import { X, ArrowLeftRight, Users, Check, AlertCircle, Info, RefreshCw } from 'lucide-react';
 import { stageApi } from '../services/api';
 
 interface PlayerSwapModalProps {
@@ -16,6 +16,7 @@ interface PlayerOption {
   gameId: string;
   groupName: string;
   seedIndex: number;
+  hasPlayed: boolean;
 }
 
 export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
@@ -28,7 +29,6 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
   const [player1Id, setPlayer1Id] = useState<string>('');
   const [player2Id, setPlayer2Id] = useState<string>('');
   const [playerOptions, setPlayerOptions] = useState<PlayerOption[]>([]);
-  const [hasScores, setHasScores] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -48,7 +48,6 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
         if (!mounted) return;
         const groups = detail.groups || [];
         const list: PlayerOption[] = [];
-        let scoresExist = false;
 
         groups.forEach((gObj: any) => {
           const gName = gObj.group?.groupName || '未命名组';
@@ -61,19 +60,13 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
                 gameId: pObj.player.gameId || '无',
                 groupName: gName,
                 seedIndex: pObj.seedIndex || 1,
+                hasPlayed: !!pObj.hasPlayed,
               });
             }
           });
-
-          // 检查是否有小局打完或已录入比分
-          const rounds = gObj.rounds || [];
-          if (rounds.some((r: any) => r.status === 'FINISHED')) {
-            scoresExist = true;
-          }
         });
 
         setPlayerOptions(list);
-        setHasScores(scoresExist);
       })
       .catch((err: any) => {
         if (mounted) setErrorMsg(err.message || '获取赛段选手分组失败');
@@ -92,6 +85,8 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
   const p1 = playerOptions.find((p) => p.playerId === player1Id);
   const p2 = playerOptions.find((p) => p.playerId === player2Id);
 
+  const canSwap = p1 && p2 && !p1.hasPlayed && !p2.hasPlayed && p1.playerId !== p2.playerId;
+
   const handleConfirmSwap = async () => {
     if (!player1Id || !player2Id) {
       setErrorMsg('请选择需要互换组别的两位选手');
@@ -101,8 +96,12 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
       setErrorMsg('互换的两位选手不能为同一个人');
       return;
     }
-    if (hasScores) {
-      setErrorMsg('当前赛段已有小局打完并产生积分，已严禁微调互换组别');
+    if (p1?.hasPlayed) {
+      setErrorMsg(`选手 [${p1.name}] 在当前赛段已有对局战绩，无法微调换人！`);
+      return;
+    }
+    if (p2?.hasPlayed) {
+      setErrorMsg(`选手 [${p2.name}] 在当前赛段已有对局战绩，无法微调换人！`);
       return;
     }
 
@@ -129,7 +128,7 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
               <span>{stageName} - 选手分组微调互换</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              仅在未开赛且本阶段积分为 0 时允许互换两名选手的组别房间
+              只要互换的两位选手均未打过比赛（无战绩记录），即可随时跨组微调互换
             </p>
           </div>
           <button
@@ -140,15 +139,13 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
           </button>
         </div>
 
-        {/* Warning if scores exist */}
-        {hasScores && (
-          <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-300 text-xs flex items-start gap-2.5">
-            <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-            <div>
-              <span className="font-bold">已开赛锁定：</span>当前赛段已有对局录入了积分，为确保竞技公平性，已严禁微调换人。如需换人请先作废对应小局比分。
-            </div>
+        {/* Rule Notice */}
+        <div className="p-3.5 rounded-xl bg-purple-950/30 border border-purple-500/30 text-purple-200 text-xs flex items-start gap-2.5">
+          <Info className="w-4 h-4 shrink-0 mt-0.5 text-purple-400" />
+          <div>
+            <span className="font-bold">微调换人规则：</span>只要互换的两位选手在当前赛段<span className="text-amber-300 font-bold">均未打过比赛（无单局战绩记录）</span>，即可随时跨组微调互换；已开赛录入成绩的选手将被锁定组别。
           </div>
-        )}
+        </div>
 
         {/* Error Notification */}
         {errorMsg && (
@@ -180,13 +177,17 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
                 <select
                   value={player1Id}
                   onChange={(e) => setPlayer1Id(e.target.value)}
-                  disabled={hasScores}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer"
                 >
                   <option value="">-- 请选择选手 A --</option>
                   {playerOptions.map((p) => (
-                    <option key={p.playerId} value={p.playerId} disabled={p.playerId === player2Id}>
-                      [{p.groupName}] {p.name} ({p.gameId})
+                    <option
+                      key={p.playerId}
+                      value={p.playerId}
+                      disabled={p.playerId === player2Id || p.hasPlayed}
+                      className={p.hasPlayed ? 'text-slate-600' : 'text-slate-100'}
+                    >
+                      {p.hasPlayed ? '⛔ [已打比赛]' : '✓ [未开赛]'} [{p.groupName}] {p.name} ({p.gameId})
                     </option>
                   ))}
                 </select>
@@ -194,7 +195,18 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
                 {p1 && (
                   <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
                     <div>
-                      <div className="font-bold text-sm text-slate-100">{p1.name}</div>
+                      <div className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+                        <span>{p1.name}</span>
+                        {p1.hasPlayed ? (
+                          <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 text-[10px] font-mono font-bold">
+                            已产生对局记录
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">
+                            可换人
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] font-mono text-slate-400">ID: {p1.gameId}</div>
                     </div>
                     <span className="px-2 py-0.5 rounded bg-purple-600/30 text-purple-300 text-xs font-bold font-mono">
@@ -212,13 +224,17 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
                 <select
                   value={player2Id}
                   onChange={(e) => setPlayer2Id(e.target.value)}
-                  disabled={hasScores}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-slate-100 focus:outline-none focus:border-purple-500 cursor-pointer"
                 >
                   <option value="">-- 请选择选手 B --</option>
                   {playerOptions.map((p) => (
-                    <option key={p.playerId} value={p.playerId} disabled={p.playerId === player1Id}>
-                      [{p.groupName}] {p.name} ({p.gameId})
+                    <option
+                      key={p.playerId}
+                      value={p.playerId}
+                      disabled={p.playerId === player1Id || p.hasPlayed}
+                      className={p.hasPlayed ? 'text-slate-600' : 'text-slate-100'}
+                    >
+                      {p.hasPlayed ? '⛔ [已打比赛]' : '✓ [未开赛]'} [{p.groupName}] {p.name} ({p.gameId})
                     </option>
                   ))}
                 </select>
@@ -226,7 +242,18 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
                 {p2 && (
                   <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
                     <div>
-                      <div className="font-bold text-sm text-slate-100">{p2.name}</div>
+                      <div className="font-bold text-sm text-slate-100 flex items-center gap-1.5">
+                        <span>{p2.name}</span>
+                        {p2.hasPlayed ? (
+                          <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 text-[10px] font-mono font-bold">
+                            已产生对局记录
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-mono font-bold">
+                            可换人
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[11px] font-mono text-slate-400">ID: {p2.gameId}</div>
                     </div>
                     <span className="px-2 py-0.5 rounded bg-amber-500/30 text-amber-300 text-xs font-bold font-mono">
@@ -239,10 +266,12 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
 
             {/* Swap Preview Badge */}
             {p1 && p2 && (
-              <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/40 flex items-center justify-center gap-3 text-xs font-semibold text-slate-200 animate-in fade-in">
+              <div className={`p-3 rounded-xl border flex items-center justify-center gap-3 text-xs font-semibold animate-in fade-in ${
+                canSwap ? 'bg-purple-950/40 border-purple-500/40 text-slate-200' : 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+              }`}>
                 <span className="text-purple-300 font-bold">{p1.name}</span>
                 <span className="text-slate-500 font-mono">({p1.groupName} $\to$ {p2.groupName})</span>
-                <ArrowLeftRight className="w-4 h-4 text-amber-400 animate-pulse" />
+                <ArrowLeftRight className={`w-4 h-4 ${canSwap ? 'text-amber-400 animate-pulse' : 'text-rose-400'}`} />
                 <span className="text-amber-300 font-bold">{p2.name}</span>
                 <span className="text-slate-500 font-mono">({p2.groupName} $\to$ {p1.groupName})</span>
               </div>
@@ -268,9 +297,9 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
             <button
               type="button"
               onClick={handleConfirmSwap}
-              disabled={submitLoading || !player1Id || !player2Id || player1Id === player2Id || hasScores || playerOptions.length === 0}
+              disabled={submitLoading || !canSwap}
               className={`${
-                !player1Id || !player2Id || player1Id === player2Id || hasScores || playerOptions.length === 0
+                !canSwap
                   ? 'bg-slate-800 text-slate-500 cursor-not-allowed px-4 py-2 rounded-lg text-xs font-bold'
                   : 'btn-primary text-xs'
               }`}

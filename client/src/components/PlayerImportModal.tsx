@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Sparkles, Users, Check, Upload, Lock, Edit3, Save, AlertCircle } from 'lucide-react';
 import { Player } from '../types';
+import { useNotification } from '../context/NotificationContext';
 
 interface PlayerImportModalProps {
   isOpen: boolean;
@@ -58,6 +59,7 @@ export const PlayerImportModal: React.FC<PlayerImportModalProps> = ({
   onImport,
   onUpdateSinglePlayer,
 }) => {
+  const { toast, alertModal } = useNotification();
   const [playersText, setPlayersText] = useState('');
   const [loading, setLoading] = useState(false);
   const [editablePlayers, setEditablePlayers] = useState<{ [id: string]: { name: string; gameId: string } }>({});
@@ -81,8 +83,6 @@ export const PlayerImportModal: React.FC<PlayerImportModalProps> = ({
     }
   }, [isOpen, currentPlayers]);
 
-  if (!isOpen) return null;
-
   const handleGenerateDemoPlayers = () => {
     const list: string[] = [];
     for (let i = 0; i < totalPlayers; i++) {
@@ -95,7 +95,11 @@ export const PlayerImportModal: React.FC<PlayerImportModalProps> = ({
 
   const handleConfirmImport = async () => {
     if (isLocked) {
-      alert('比赛已开赛，全量覆盖导入已锁定！请在单人修改区域直接编辑选手信息。');
+      alertModal({
+        title: '全量导入已锁定',
+        message: '比赛已开赛，全量覆盖导入已锁定！请在下方单人修改区域直接编辑选手姓名和游戏 ID。',
+        type: 'warning',
+      });
       return;
     }
 
@@ -105,7 +109,11 @@ export const PlayerImportModal: React.FC<PlayerImportModalProps> = ({
       .filter((l) => l.length > 0);
 
     if (lines.length !== totalPlayers) {
-      alert(`当前输入选手共 ${lines.length} 人，必须恰好等于赛事设定的 ${totalPlayers} 人！`);
+      alertModal({
+        title: '选手人数不匹配',
+        message: `当前输入选手共 ${lines.length} 人，必须恰好等于赛事设定的 ${totalPlayers} 人！`,
+        type: 'warning',
+      });
       return;
     }
 
@@ -125,7 +133,11 @@ export const PlayerImportModal: React.FC<PlayerImportModalProps> = ({
       await onImport(tournamentId, payload);
       onClose();
     } catch (err: any) {
-      alert(err.message || '导入选手失败');
+      alertModal({
+        title: '导入选手失败',
+        message: err.message || '导入选手名册失败',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -134,20 +146,31 @@ export const PlayerImportModal: React.FC<PlayerImportModalProps> = ({
   const handleSaveSingle = async (pId: string) => {
     const edit = editablePlayers[pId];
     if (!edit || !edit.name.trim()) {
-      alert('选手姓名不能为空');
+      alertModal({
+        title: '输入有误',
+        message: '选手姓名不能为空',
+        type: 'warning',
+      });
       return;
     }
     try {
       setSavingPlayerId(pId);
       await onUpdateSinglePlayer(pId, edit.name, edit.gameId);
       setSavedSuccessId(pId);
+      toast.success('选手信息修改成功！');
       setTimeout(() => setSavedSuccessId(null), 2000);
     } catch (err: any) {
-      alert(err.message || '修改选手失败');
+      alertModal({
+        title: '修改选手失败',
+        message: err.message || '修改选手信息失败',
+        type: 'error',
+      });
     } finally {
       setSavingPlayerId(null);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">

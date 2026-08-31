@@ -1,6 +1,7 @@
 package com.yunding.config;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -17,8 +18,8 @@ public class SseEmitterManager {
     private final Map<String, CopyOnWriteArrayList<SseEmitter>> emitterMap = new ConcurrentHashMap<>();
 
     public SseEmitter createEmitter(String shareCode) {
-        // 5分钟超时
-        SseEmitter emitter = new SseEmitter(5 * 60 * 1000L);
+        // 10分钟超时
+        SseEmitter emitter = new SseEmitter(10 * 60 * 1000L);
         emitterMap.computeIfAbsent(shareCode, k -> new CopyOnWriteArrayList<>()).add(emitter);
 
         emitter.onCompletion(() -> removeEmitter(shareCode, emitter));
@@ -32,6 +33,21 @@ public class SseEmitterManager {
         }
 
         return emitter;
+    }
+
+    @Scheduled(fixedRate = 15000)
+    public void sendHeartbeat() {
+        if (emitterMap.isEmpty()) return;
+        for (Map.Entry<String, CopyOnWriteArrayList<SseEmitter>> entry : emitterMap.entrySet()) {
+            String shareCode = entry.getKey();
+            for (SseEmitter emitter : entry.getValue()) {
+                try {
+                    emitter.send(SseEmitter.event().name("HEARTBEAT").data("ping"));
+                } catch (Exception e) {
+                    removeEmitter(shareCode, emitter);
+                }
+            }
+        }
     }
 
     public void broadcast(String shareCode, String eventName, Object data) {

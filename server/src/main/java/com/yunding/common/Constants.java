@@ -20,6 +20,10 @@ public interface Constants {
     String STAGE_COMPLETED = "COMPLETED";
     String STAGE_LOCKED = "LOCKED";
 
+    // 赛段类型
+    String STAGE_TYPE_STANDARD = "STANDARD";
+    String STAGE_TYPE_CHECKPOINT_FINAL = "CHECKPOINT_FINAL";
+
     // 晋级状态
     String ADVANCE_NONE = "NONE";
     String ADVANCE_QUALIFIED = "ADVANCED";

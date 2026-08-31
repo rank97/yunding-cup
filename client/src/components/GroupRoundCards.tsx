@@ -1,16 +1,18 @@
 import React from 'react';
-import { Crown, Edit3, RotateCcw, CheckCircle2, Clock } from 'lucide-react';
+import { Crown, Edit3, RotateCcw, CheckCircle2, Clock, Lock } from 'lucide-react';
 import { GroupDetails, GroupRow, RoundCard, PlayerRankItem } from '../types';
 
 interface GroupRoundCardsProps {
   groupDetails: GroupDetails;
   isAdmin?: boolean;
+  isLocked?: boolean;
   onOpenScoreModal?: (roundId: string, groupName: string, roundNumber: number) => void;
 }
 
 export const GroupRoundCards: React.FC<GroupRoundCardsProps> = ({
   groupDetails,
   isAdmin = false,
+  isLocked = false,
   onOpenScoreModal,
 }) => {
   const { groups } = groupDetails;
@@ -46,6 +48,8 @@ export const GroupRoundCards: React.FC<GroupRoundCardsProps> = ({
                     className={`w-72 rounded-xl p-4 border transition-all duration-200 ${
                       isFinished
                         ? 'bg-slate-900/80 border-slate-700/60 shadow-lg hover:border-purple-500/50'
+                        : isLocked
+                        ? 'bg-slate-950/40 border-dashed border-slate-800 opacity-60'
                         : 'bg-slate-900/40 border-dashed border-slate-700/80 opacity-90'
                     }`}
                   >
@@ -60,6 +64,10 @@ export const GroupRoundCards: React.FC<GroupRoundCardsProps> = ({
                             <CheckCircle2 className="w-3 h-3" />
                             已完赛
                           </span>
+                        ) : isLocked ? (
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 text-[10px] font-mono flex items-center gap-0.5 border border-amber-500/20">
+                            🏆 提前夺冠结赛
+                          </span>
                         ) : (
                           <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] font-mono flex items-center gap-0.5">
                             <Clock className="w-3 h-3" />
@@ -70,13 +78,20 @@ export const GroupRoundCards: React.FC<GroupRoundCardsProps> = ({
 
                       {/* Admin Quick Entry Button */}
                       {isAdmin && onOpenScoreModal && (
-                        <button
-                          onClick={() => onOpenScoreModal(round.matchRoundId, group.groupName, round.roundNumber)}
-                          className="px-2 py-1 rounded bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 text-xs font-medium border border-purple-500/30 transition-all flex items-center gap-1"
-                        >
-                          <Edit3 className="w-3 h-3" />
-                          <span>{isFinished ? '修改' : '录入'}</span>
-                        </button>
+                        isLocked ? (
+                          <span className="px-2 py-0.5 rounded bg-slate-800/80 text-slate-500 text-[10px] font-mono flex items-center gap-1 border border-slate-700/40">
+                            <Lock className="w-3 h-3" />
+                            已锁定
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => onOpenScoreModal(round.matchRoundId, group.groupName, round.roundNumber)}
+                            className="px-2 py-1 rounded bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 text-xs font-medium border border-purple-500/30 transition-all flex items-center gap-1"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>{isFinished ? '修改' : '录入'}</span>
+                          </button>
+                        )
                       )}
                     </div>
 

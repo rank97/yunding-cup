@@ -40,7 +40,8 @@ public class TournamentController {
     @SaCheckLogin
     public Result<Map<String, Object>> getTournamentDetail(@PathVariable String id) {
         String tenantId = (String) StpUtil.getLoginId();
-        return Result.success(tournamentService.getTournamentDetail(id, tenantId));
+        String role = (String) StpUtil.getSession().get("role");
+        return Result.success(tournamentService.getTournamentDetail(id, tenantId, role));
     }
 
     @PutMapping("/{id}")
@@ -55,7 +56,8 @@ public class TournamentController {
     @SaCheckLogin
     public Result<?> updateStages(@PathVariable String id, @RequestBody List<StageCreateDTO> stages) {
         String tenantId = (String) StpUtil.getLoginId();
-        tournamentService.updateStages(id, stages, tenantId);
+        String role = (String) StpUtil.getSession().get("role");
+        tournamentService.updateStages(id, stages, tenantId, role);
         return Result.success();
     }
 
@@ -63,7 +65,8 @@ public class TournamentController {
     @SaCheckLogin
     public Result<?> deleteTournament(@PathVariable String id) {
         String tenantId = (String) StpUtil.getLoginId();
-        tournamentService.deleteTournament(id, tenantId);
+        String role = (String) StpUtil.getSession().get("role");
+        tournamentService.deleteTournament(id, tenantId, role);
         return Result.success();
     }
 }

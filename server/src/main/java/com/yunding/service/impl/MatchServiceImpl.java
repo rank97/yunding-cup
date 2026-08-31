@@ -1,5 +1,6 @@
 package com.yunding.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,9 +32,29 @@ public class MatchServiceImpl implements MatchService {
     private final SseEmitterManager sseEmitterManager;
     private final ObjectMapper objectMapper;
 
+    private void checkMatchRoundPermission(String matchRoundId) {
+        String loginId = (String) StpUtil.getLoginIdDefaultNull();
+        if (loginId == null) return;
+        String role = (String) StpUtil.getSession().get("role");
+        if (Constants.ROLE_SUPER_ADMIN.equals(role)) return;
+
+        MatchRound round = matchRoundMapper.selectById(matchRoundId);
+        if (round == null) throw new BizException("对局不存在");
+        StageGroup group = stageGroupMapper.selectById(round.getStageGroupId());
+        if (group == null) throw new BizException("分组不存在");
+        Stage stage = stageMapper.selectById(group.getStageId());
+        if (stage == null) throw new BizException("赛段不存在");
+        Tournament tournament = tournamentMapper.selectById(stage.getTournamentId());
+        if (tournament == null || tournament.getIsDeleted() == 1) throw new BizException("赛事不存在");
+        if (!tournament.getTenantId().equals(loginId)) {
+            throw new BizException("无权操作他人创建的赛事比分");
+        }
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void submitRoundRecord(String matchRoundId, RoundRecordSubmitDTO dto) {
+        checkMatchRoundPermission(matchRoundId);
         MatchRound round = matchRoundMapper.selectById(matchRoundId);
         if (round == null) {
             throw new BizException("对局不存在");
@@ -41,8 +62,9 @@ public class MatchServiceImpl implements MatchService {
 
         StageGroup group = stageGroupMapper.selectById(round.getStageGroupId());
         Stage stage = stageMapper.selectById(group.getStageId());
-        if (Constants.STAGE_LOCKED.equals(stage.getStatus())) {
-            throw new BizException("当前赛段已锁定，严禁修改成绩");
+        Tournament tournament = tournamentMapper.selectById(stage.getTournamentId());
+        if (Constants.STAGE_LOCKED.equals(stage.getStatus()) || (tournament != null && Constants.TOURNAMENT_COMPLETED.equals(tournament.getStatus()))) {
+            throw new BizException("当前赛段已锁定（或总决赛已决出冠军完赛），严禁再录入或修改成绩！如需调整比分请先在上方点击【解锁赛段】。");
         }
 
         List<RoundRecordSubmitDTO.PlayerRecordItem> items = dto.getRecords();
@@ -98,7 +120,6 @@ public class MatchServiceImpl implements MatchService {
         recalculateStageScores(stage);
 
         // 触发实时大屏推流
-        Tournament tournament = tournamentMapper.selectById(stage.getTournamentId());
         sseEmitterManager.broadcast(tournament.getShareCode(), "SCORE_UPDATED", Map.of(
                 "stageId", stage.getId(),
                 "matchRoundId", matchRoundId,
@@ -110,6 +131,7 @@ public class MatchServiceImpl implements MatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void resetRoundRecord(String matchRoundId) {
+        checkMatchRoundPermission(matchRoundId);
         MatchRound round = matchRoundMapper.selectById(matchRoundId);
         if (round == null) {
             throw new BizException("对局不存在");
@@ -117,8 +139,9 @@ public class MatchServiceImpl implements MatchService {
 
         StageGroup group = stageGroupMapper.selectById(round.getStageGroupId());
         Stage stage = stageMapper.selectById(group.getStageId());
-        if (Constants.STAGE_LOCKED.equals(stage.getStatus())) {
-            throw new BizException("当前赛段已锁定，严禁重置成绩");
+        Tournament tournament = tournamentMapper.selectById(stage.getTournamentId());
+        if (Constants.STAGE_LOCKED.equals(stage.getStatus()) || (tournament != null && Constants.TOURNAMENT_COMPLETED.equals(tournament.getStatus()))) {
+            throw new BizException("当前赛段已锁定（或总决赛已决出冠军完赛），严禁作废重置成绩！如需调整比分请先在上方点击【解锁赛段】。");
         }
 
         gameRecordMapper.delete(new LambdaQueryWrapper<GameRecord>().eq(GameRecord::getMatchRoundId, matchRoundId));
@@ -127,14 +150,22 @@ public class MatchServiceImpl implements MatchService {
 
         recalculateStageScores(stage);
 
-        Tournament tournament = tournamentMapper.selectById(stage.getTournamentId());
         sseEmitterManager.broadcast(tournament.getShareCode(), "ROUND_RESET", Map.of(
                 "stageId", stage.getId(),
                 "matchRoundId", matchRoundId
         ));
     }
 
-    private void recalculateStageScores(Stage stage) {
+    @Override
+    public void recalculateStageScores(String stageId) {
+        Stage stage = stageMapper.selectById(stageId);
+        if (stage != null) {
+            recalculateStageScores(stage);
+        }
+    }
+
+    @Override
+    public void recalculateStageScores(Stage stage) {
         // 查找本赛段所有组的所有小局
         List<StageGroup> groups = stageGroupMapper.selectList(new LambdaQueryWrapper<StageGroup>()
                 .eq(StageGroup::getStageId, stage.getId()));
@@ -161,6 +192,13 @@ public class MatchServiceImpl implements MatchService {
                 .eq(StagePlayerState::getStageId, stage.getId()));
 
         boolean isFinalStage = "CHECKPOINT_FINAL".equalsIgnoreCase(stage.getStageType());
+        boolean inherit = stage.getInheritScores() != null && stage.getInheritScores() == 1;
+
+        // 查找当前赛段之前的所有赛段（按 stageOrder 降序）
+        List<Stage> prevStages = stageMapper.selectList(new LambdaQueryWrapper<Stage>()
+                .eq(Stage::getTournamentId, stage.getTournamentId())
+                .lt(Stage::getStageOrder, stage.getStageOrder())
+                .orderByDesc(Stage::getStageOrder));
 
         for (StagePlayerState state : states) {
             List<GameRecord> pRecords = playerRecordMap.getOrDefault(state.getPlayerId(), Collections.emptyList());
@@ -178,8 +216,23 @@ public class MatchServiceImpl implements MatchService {
                 }
             }
 
+            // 实时动态计算底分：如果开启 inheritScores，从该选手最近一次有分数的上一赛段获取总分
+            int carryScore = 0;
+            if (inherit && !prevStages.isEmpty()) {
+                for (Stage ps : prevStages) {
+                    StagePlayerState prevState = stagePlayerStateMapper.selectOne(new LambdaQueryWrapper<StagePlayerState>()
+                            .eq(StagePlayerState::getStageId, ps.getId())
+                            .eq(StagePlayerState::getPlayerId, state.getPlayerId()));
+                    if (prevState != null && prevState.getTotalScore() != null) {
+                        carryScore = prevState.getTotalScore();
+                        break;
+                    }
+                }
+            }
+
+            state.setCarryOverScore(carryScore);
             state.setStageScore(stageScore);
-            int totalScore = (state.getCarryOverScore() != null ? state.getCarryOverScore() : 0) + stageScore;
+            int totalScore = carryScore + stageScore;
             state.setTotalScore(totalScore);
             state.setFirstPlaceCount(firstPlaces);
             state.setTop4Count(top4s);
@@ -190,6 +243,154 @@ public class MatchServiceImpl implements MatchService {
             }
 
             stagePlayerStateMapper.updateById(state);
+        }
+
+        // 登顶夺冠逻辑判定（针对 CHECKPOINT_FINAL）
+        String checkmateWinnerId = null;
+        Integer checkmateRoundNumber = null;
+
+        if (isFinalStage) {
+            List<MatchRound> finishedRounds = allRounds.stream()
+                    .filter(r -> Constants.ROUND_FINISHED.equals(r.getStatus()))
+                    .sorted(Comparator.comparing(MatchRound::getRoundNumber))
+                    .toList();
+
+            Map<String, Integer> runningScores = new HashMap<>();
+            for (StagePlayerState state : states) {
+                runningScores.put(state.getPlayerId(), state.getCarryOverScore() != null ? state.getCarryOverScore() : 0);
+            }
+
+            for (MatchRound mr : finishedRounds) {
+                List<GameRecord> rRecords = gameRecordMapper.selectList(new LambdaQueryWrapper<GameRecord>()
+                        .eq(GameRecord::getMatchRoundId, mr.getId()));
+
+                // 检查本局吃鸡者在开赛前是否已经达到 20 分（拥有赛点）
+                for (GameRecord gr : rRecords) {
+                    int prevScore = runningScores.getOrDefault(gr.getPlayerId(), 0);
+                    if (gr.getRank() == 1 && prevScore >= 20) {
+                        checkmateWinnerId = gr.getPlayerId();
+                        checkmateRoundNumber = mr.getRoundNumber();
+                        break;
+                    }
+                }
+
+                if (checkmateWinnerId != null) {
+                    break;
+                }
+
+                for (GameRecord gr : rRecords) {
+                    runningScores.put(gr.getPlayerId(), runningScores.getOrDefault(gr.getPlayerId(), 0) + gr.getScore());
+                }
+            }
+        }
+
+        // 如果赛段未锁定，检查是否满足结赛条件
+        if (!Constants.STAGE_LOCKED.equals(stage.getStatus())) {
+            boolean allRoundsFinished = !allRounds.isEmpty() && allRounds.stream().allMatch(r -> Constants.ROUND_FINISHED.equals(r.getStatus()));
+            boolean hasCheckmateWinner = isFinalStage && checkmateWinnerId != null;
+
+            if (hasCheckmateWinner) {
+                // 有选手在进入该局前已达20分并在本局吃鸡，达成【20分登顶夺冠】，总决赛提前完赛！
+                final String winnerId = checkmateWinnerId;
+                List<StagePlayerState> others = states.stream()
+                        .filter(s -> !s.getPlayerId().equals(winnerId))
+                        .sorted((a, b) -> {
+                            if (!b.getTotalScore().equals(a.getTotalScore())) return b.getTotalScore().compareTo(a.getTotalScore());
+                            if (!b.getFirstPlaceCount().equals(a.getFirstPlaceCount())) return b.getFirstPlaceCount().compareTo(a.getFirstPlaceCount());
+                            if (!b.getTop4Count().equals(a.getTop4Count())) return b.getTop4Count().compareTo(a.getTop4Count());
+                            return a.getPlayerId().compareTo(b.getPlayerId());
+                        })
+                        .toList();
+
+                for (StagePlayerState s : states) {
+                    if (s.getPlayerId().equals(winnerId)) {
+                        s.setFinalRank(1);
+                        s.setAdvancementStatus(Constants.ADVANCE_CHAMPION);
+                    } else {
+                        int rankIdx = others.indexOf(s);
+                        s.setFinalRank(rankIdx + 2);
+                        s.setAdvancementStatus(Constants.ADVANCE_NONE);
+                    }
+                    stagePlayerStateMapper.updateById(s);
+                }
+
+                // 登顶夺冠：总决赛赛段立即锁定完赛，赛事状态立即转为 COMPLETED
+                stage.setStatus(Constants.STAGE_LOCKED);
+                stageMapper.updateById(stage);
+
+                Tournament tournament = tournamentMapper.selectById(stage.getTournamentId());
+                if (tournament != null) {
+                    tournament.setStatus(Constants.TOURNAMENT_COMPLETED);
+                    tournamentMapper.updateById(tournament);
+                    sseEmitterManager.broadcast(tournament.getShareCode(), "STAGE_LOCKED", Map.of("stageId", stage.getId()));
+                }
+            } else if (allRoundsFinished) {
+                // 所有小局全部打完（若为决赛打满8局仍无人达成20分+吃鸡，按总积分最高者夺冠）
+                states.sort((a, b) -> {
+                    if (!b.getTotalScore().equals(a.getTotalScore())) return b.getTotalScore().compareTo(a.getTotalScore());
+                    if (!b.getFirstPlaceCount().equals(a.getFirstPlaceCount())) return b.getFirstPlaceCount().compareTo(a.getFirstPlaceCount());
+                    if (!b.getTop4Count().equals(a.getTop4Count())) return b.getTop4Count().compareTo(a.getTop4Count());
+                    return a.getPlayerId().compareTo(b.getPlayerId());
+                });
+
+                int totalCount = states.size();
+                int directCount = stage.getDirectToFinalCount() != null ? stage.getDirectToFinalCount() : 0;
+                int elimCount = stage.getEliminateCount() != null ? stage.getEliminateCount() : 0;
+                int advanceCount = totalCount - directCount - elimCount;
+
+                boolean allNone = states.stream().allMatch(s -> s.getAdvancementStatus() == null || Constants.ADVANCE_NONE.equals(s.getAdvancementStatus()));
+
+                for (int i = 0; i < totalCount; i++) {
+                    StagePlayerState s = states.get(i);
+                    s.setFinalRank(i + 1);
+                    if (allNone) {
+                        if (isFinalStage) {
+                            if (i == 0) {
+                                s.setAdvancementStatus(Constants.ADVANCE_CHAMPION);
+                            } else {
+                                s.setAdvancementStatus(Constants.ADVANCE_NONE);
+                            }
+                        } else {
+                            if (i < directCount) {
+                                s.setAdvancementStatus(Constants.ADVANCE_DIRECT_FINAL);
+                            } else if (i < directCount + advanceCount) {
+                                s.setAdvancementStatus(Constants.ADVANCE_QUALIFIED);
+                            } else {
+                                s.setAdvancementStatus(Constants.ADVANCE_ELIMINATED);
+                            }
+                        }
+                    }
+                    stagePlayerStateMapper.updateById(s);
+                }
+
+                if (isFinalStage) {
+                    // 决赛打满所有轮次：总决赛赛段立即锁定完赛，赛事状态立即转为 COMPLETED
+                    stage.setStatus(Constants.STAGE_LOCKED);
+                    stageMapper.updateById(stage);
+
+                    Tournament tournament = tournamentMapper.selectById(stage.getTournamentId());
+                    if (tournament != null) {
+                        tournament.setStatus(Constants.TOURNAMENT_COMPLETED);
+                        tournamentMapper.updateById(tournament);
+                        sseEmitterManager.broadcast(tournament.getShareCode(), "STAGE_LOCKED", Map.of("stageId", stage.getId()));
+                    }
+                }
+            } else {
+                // 尚在比赛中且未决出登顶冠军：按实时得分展示临时排名，晋级状态为 NONE
+                states.sort((a, b) -> {
+                    if (!b.getTotalScore().equals(a.getTotalScore())) return b.getTotalScore().compareTo(a.getTotalScore());
+                    if (!b.getFirstPlaceCount().equals(a.getFirstPlaceCount())) return b.getFirstPlaceCount().compareTo(a.getFirstPlaceCount());
+                    if (!b.getTop4Count().equals(a.getTop4Count())) return b.getTop4Count().compareTo(a.getTop4Count());
+                    return a.getPlayerId().compareTo(b.getPlayerId());
+                });
+
+                for (int i = 0; i < states.size(); i++) {
+                    StagePlayerState s = states.get(i);
+                    s.setAdvancementStatus(Constants.ADVANCE_NONE);
+                    s.setFinalRank(i + 1);
+                    stagePlayerStateMapper.updateById(s);
+                }
+            }
         }
     }
 

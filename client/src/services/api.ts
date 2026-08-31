@@ -68,6 +68,10 @@ export const stageApi = {
   clearGrouping: (stageId: string): Promise<void> => api.post(`/stages/${stageId}/clear-grouping`),
   lockStage: (stageId: string): Promise<void> => api.post(`/stages/${stageId}/lock`),
   unlockStage: (stageId: string): Promise<void> => api.post(`/stages/${stageId}/unlock`),
+  updatePlayerAdvancement: (stageId: string, playerId: string, advancementStatus: string): Promise<void> =>
+    api.put(`/stages/${stageId}/players/${playerId}/advancement`, { advancementStatus }),
+  autoAssignAdvancement: (stageId: string): Promise<void> =>
+    api.post(`/stages/${stageId}/advancement/auto-assign`),
 };
 
 // Matches
@@ -83,6 +87,8 @@ export const publicApi = {
   getOverview: (shareCode: string): Promise<TournamentOverview> =>
     api.get(`/public/tournaments/${shareCode}/overview`),
   getLeaderboard: (shareCode: string, stageId: string): Promise<StageLeaderboard> =>
+    api.get(`/public/tournaments/${shareCode}/stages/${stageId}/leaderboard`),
+  getStageLeaderboard: (shareCode: string, stageId: string): Promise<StageLeaderboard> =>
     api.get(`/public/tournaments/${shareCode}/stages/${stageId}/leaderboard`),
   getGroupDetails: (shareCode: string, stageId: string): Promise<GroupDetails> =>
     api.get(`/public/tournaments/${shareCode}/stages/${stageId}/group-details`),

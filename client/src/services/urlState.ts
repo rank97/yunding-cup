@@ -1,53 +1,30 @@
 export interface UrlNavState {
-  view?: 'spectator' | 'admin';
   share?: string;
-  tab?: 'mindmap' | 'details';
   stage?: string;
 }
 
 export const getUrlNavState = (): UrlNavState => {
   const params = new URLSearchParams(window.location.search);
   return {
-    view: (params.get('view') === 'admin' ? 'admin' : 'spectator') as 'spectator' | 'admin',
     share: params.get('share') || undefined,
-    tab: (params.get('tab') === 'details' ? 'details' : 'mindmap') as 'mindmap' | 'details',
     stage: params.get('stage') || undefined,
   };
 };
 
 export const updateUrlNavState = (updates: Partial<UrlNavState>) => {
-  const params = new URLSearchParams(window.location.search);
+  const current = getUrlNavState();
+  const next: UrlNavState = { ...current, ...updates };
 
-  if (updates.view !== undefined) {
-    if (updates.view === 'admin') {
-      params.set('view', 'admin');
-    } else {
-      params.delete('view'); // 默认 spectator
-    }
+  const params = new URLSearchParams();
+
+  // 1. share: 赛事 8 位短分享码 (如 share=ZZM27GV5，首页未选赛时无任何参数)
+  if (next.share) {
+    params.set('share', next.share);
   }
 
-  if (updates.share !== undefined) {
-    if (updates.share) {
-      params.set('share', updates.share);
-    } else {
-      params.delete('share');
-    }
-  }
-
-  if (updates.tab !== undefined) {
-    if (updates.tab === 'details') {
-      params.set('tab', 'details');
-    } else {
-      params.delete('tab'); // 默认 mindmap
-    }
-  }
-
-  if (updates.stage !== undefined) {
-    if (updates.stage) {
-      params.set('stage', updates.stage);
-    } else {
-      params.delete('stage');
-    }
+  // 2. stage: 赛段序号 (stage=2, stage=3 等；第 1 赛段/初赛默认省略)
+  if (next.stage && next.stage !== '1') {
+    params.set('stage', next.stage);
   }
 
   const queryStr = params.toString();

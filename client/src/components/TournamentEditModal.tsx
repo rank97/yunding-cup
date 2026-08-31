@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Check, AlertTriangle, Lock, Sparkles, Layers } from 'lucide-react';
+import { X, Settings, Check, AlertTriangle, Lock, Sparkles, Layers, ShieldAlert, Crown } from 'lucide-react';
 import { Tournament, Stage } from '../types';
+import { useNotification } from '../context/NotificationContext';
 
 interface TournamentEditModalProps {
   isOpen: boolean;
@@ -13,13 +14,14 @@ interface TournamentEditModalProps {
 interface EditableStageDraft {
   id: string;
   name: string;
-  roundCount: number;
-  directToFinalCount: number;
-  eliminateCount: number;
+  roundCount: number | string;
+  directToFinalCount: number | string;
+  eliminateCount: number | string;
   inheritScores: number;
   stageType: string;
   status: string;
   isLocked: boolean;
+  isGrouped: boolean;
 }
 
 export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
@@ -29,6 +31,7 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
   stages,
   onUpdate,
 }) => {
+  const { toast, alertModal } = useNotification();
   const [title, setTitle] = useState('');
   const [draftStages, setDraftStages] = useState<EditableStageDraft[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,17 +41,22 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
     if (isOpen && tournament && stages) {
       setTitle(tournament.title);
       setDraftStages(
-        stages.map((s, idx) => ({
-          id: s.id,
-          name: s.name,
-          roundCount: s.roundCount,
-          directToFinalCount: s.directToFinalCount || 0,
-          eliminateCount: s.eliminateCount || 0,
-          inheritScores: idx === 0 ? 0 : (s.inheritScores || 0),
-          stageType: s.stageType || 'STANDARD',
-          status: s.status,
-          isLocked: s.status === 'LOCKED',
-        }))
+        stages.map((s, idx) => {
+          const isFinal = idx === stages.length - 1;
+          const isGrouped = s.status === 'GROUPED' || s.status === 'IN_PROGRESS' || s.status === 'LOCKED';
+          return {
+            id: s.id,
+            name: s.name,
+            roundCount: isFinal ? 8 : (s.roundCount ?? 3),
+            directToFinalCount: isFinal ? 0 : (s.directToFinalCount || 0),
+            eliminateCount: isFinal ? 0 : (s.eliminateCount || 0),
+            inheritScores: idx === 0 ? 0 : (s.inheritScores || 0),
+            stageType: isFinal ? 'CHECKPOINT_FINAL' : (s.stageType || 'STANDARD'),
+            status: s.status,
+            isLocked: s.status === 'LOCKED',
+            isGrouped,
+          };
+        })
       );
     }
   }, [isOpen, tournament, stages]);
@@ -64,6 +72,9 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
       const stage = draftStages[i];
       const isFinal = i === draftStages.length - 1;
 
+      const direct = stage.directToFinalCount === '' ? 0 : Number(stage.directToFinalCount) || 0;
+      const elim = stage.eliminateCount === '' ? 0 : Number(stage.eliminateCount) || 0;
+
       if (isFinal) {
         if (directTotal + current !== 8) {
           setValidationError(
@@ -72,7 +83,7 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
           return;
         }
       } else {
-        const next = current - (stage.directToFinalCount || 0) - (stage.eliminateCount || 0);
+        const next = current - direct - elim;
         if (next <= 0) {
           setValidationError(`赛段 [${stage.name || `第${i + 1}阶段`}] 晋级人数为 ${next} 人，人数不足以开赛`);
           return;
@@ -83,15 +94,13 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
           );
           return;
         }
-        directTotal += stage.directToFinalCount || 0;
+        directTotal += direct;
         current = next;
       }
     }
 
     setValidationError(null);
   }, [isOpen, title, draftStages, tournament]);
-
-  if (!isOpen) return null;
 
   const handleUpdateStageField = (idx: number, field: keyof EditableStageDraft, value: any) => {
     setDraftStages((prev) => {
@@ -103,37 +112,55 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
 
   const handleSave = async () => {
     if (!title.trim()) {
-      alert('赛事名称不能为空');
+      alertModal({
+        title: '输入有误',
+        message: '赛事名称不能为空',
+        type: 'warning',
+      });
       return;
     }
     if (validationError) {
-      alert(validationError);
+      alertModal({
+        title: '赛程规则校验未通过',
+        message: validationError,
+        type: 'warning',
+      });
       return;
     }
 
     const payload = {
       title: title.trim(),
-      stages: draftStages.map((s, idx) => ({
-        id: s.id,
-        name: s.name,
-        roundCount: s.roundCount,
-        directToFinalCount: s.directToFinalCount,
-        eliminateCount: s.eliminateCount,
-        inheritScores: idx === 0 ? 0 : s.inheritScores,
-        stageType: s.stageType,
-      })),
+      stages: draftStages.map((s, idx) => {
+        const isFinal = idx === draftStages.length - 1;
+        return {
+          id: s.id,
+          name: s.name.trim() || (isFinal ? '巅峰总决赛' : `阶段 ${idx + 1}`),
+          roundCount: isFinal ? 8 : (s.roundCount === '' ? 3 : Number(s.roundCount) || 3),
+          directToFinalCount: isFinal ? 0 : (s.directToFinalCount === '' ? 0 : Number(s.directToFinalCount) || 0),
+          eliminateCount: isFinal ? 0 : (s.eliminateCount === '' ? 0 : Number(s.eliminateCount) || 0),
+          inheritScores: idx === 0 ? 0 : s.inheritScores,
+          stageType: isFinal ? 'CHECKPOINT_FINAL' : s.stageType,
+        };
+      }),
     };
 
     try {
       setLoading(true);
       await onUpdate(tournament.id, payload);
+      toast.success('赛事与赛程配置已成功更新！');
       onClose();
     } catch (err: any) {
-      alert(err.message || '更新赛事信息失败');
+      alertModal({
+        title: '更新赛事失败',
+        message: err.message || '更新赛事信息失败',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -143,10 +170,10 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
           <div>
             <h3 className="font-extrabold text-lg text-slate-100 flex items-center gap-2">
               <Settings className="w-5 h-5 text-purple-400" />
-              <span>赛事基本信息与未开赛程修改</span>
+              <span>赛事基本信息与赛段修改</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              已完赛锁定的赛程不可修改；未打比赛的赛段允许动态微调赛制并实时校验闭包
+              已生成分组或已完赛的赛段不可修改晋级规则（需先清除分组）；总决赛固定为 20 分登顶制（最高 8 局）
             </p>
           </div>
           <button
@@ -195,6 +222,8 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
             {draftStages.map((stage, idx) => {
               const isFinal = idx === draftStages.length - 1;
               const isLocked = stage.isLocked;
+              const isGrouped = stage.isGrouped;
+              const disableRules = isLocked || isGrouped;
 
               return (
                 <div
@@ -202,6 +231,8 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                   className={`p-4 rounded-xl border transition-all ${
                     isLocked
                       ? 'bg-slate-950/60 border-slate-800/80 opacity-80'
+                      : isGrouped
+                      ? 'bg-slate-950/50 border-amber-500/30'
                       : isFinal
                       ? 'glass-panel-gold border-amber-500/50'
                       : 'bg-slate-900/70 border-slate-800'
@@ -228,13 +259,19 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                           <Lock className="w-3 h-3 text-emerald-400" />
                           已完赛锁定 (不可更改赛制)
                         </span>
+                      ) : isGrouped ? (
+                        <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold flex items-center gap-1">
+                          <ShieldAlert className="w-3 h-3 text-amber-400" />
+                          已生成分组 (不可修改赛制，需在工作台【清除分组】后修改)
+                        </span>
                       ) : isFinal ? (
-                        <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px] font-bold">
-                          👑 20分登顶总决赛 (固定8人)
+                        <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px] font-bold flex items-center gap-1">
+                          <Crown className="w-3 h-3 text-amber-400" />
+                          <span>20分登顶总决赛 (固定8人，最高8局)</span>
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-bold">
-                          可编辑赛段
+                          未开赛 (可修改赛制规则)
                         </span>
                       )}
                     </div>
@@ -252,18 +289,21 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-slate-400 block mb-1">比赛局数</label>
+                      <label className="text-slate-400 block mb-1">
+                        {isFinal ? '比赛局数 (固定上限)' : '比赛局数'}
+                      </label>
                       <input
                         type="number"
                         min="1"
                         max="20"
-                        value={stage.roundCount}
-                        disabled={isLocked}
-                        onChange={(e) =>
-                          handleUpdateStageField(idx, 'roundCount', parseInt(e.target.value) || 1)
-                        }
+                        value={isFinal ? 8 : (stage.roundCount ?? '')}
+                        disabled={disableRules || isFinal}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : (parseInt(e.target.value) || '');
+                          handleUpdateStageField(idx, 'roundCount', val);
+                        }}
                         className={`w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-slate-100 font-mono focus:outline-none focus:border-purple-500 ${
-                          isLocked ? 'opacity-50 cursor-not-allowed' : ''
+                          disableRules || isFinal ? 'opacity-60 cursor-not-allowed text-amber-300 font-bold' : ''
                         }`}
                       />
                     </div>
@@ -275,13 +315,15 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                           <input
                             type="number"
                             min="0"
-                            value={stage.directToFinalCount}
-                            disabled={isLocked}
-                            onChange={(e) =>
-                              handleUpdateStageField(idx, 'directToFinalCount', parseInt(e.target.value) || 0)
-                            }
+                            value={stage.directToFinalCount ?? ''}
+                            disabled={disableRules}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : (parseInt(e.target.value) || 0);
+                              handleUpdateStageField(idx, 'directToFinalCount', val);
+                            }}
+                            placeholder="0"
                             className={`w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-amber-300 font-mono focus:outline-none focus:border-amber-500 ${
-                              isLocked ? 'opacity-50 cursor-not-allowed' : ''
+                              disableRules ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
                           />
                         </div>
@@ -291,13 +333,15 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                           <input
                             type="number"
                             min="0"
-                            value={stage.eliminateCount}
-                            disabled={isLocked}
-                            onChange={(e) =>
-                              handleUpdateStageField(idx, 'eliminateCount', parseInt(e.target.value) || 0)
-                            }
+                            value={stage.eliminateCount ?? ''}
+                            disabled={disableRules}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? '' : (parseInt(e.target.value) || 0);
+                              handleUpdateStageField(idx, 'eliminateCount', val);
+                            }}
+                            placeholder="0"
                             className={`w-full px-2.5 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-rose-300 font-mono focus:outline-none focus:border-rose-500 ${
-                              isLocked ? 'opacity-50 cursor-not-allowed' : ''
+                              disableRules ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
                           />
                         </div>
@@ -306,17 +350,15 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                           {idx === 0 ? (
                             <span className="text-[11px] text-slate-500 font-mono">首赛段 (无前置底分)</span>
                           ) : (
-                            <label className="flex items-center gap-1.5 cursor-pointer text-slate-300">
+                            <label className={`flex items-center gap-1.5 text-slate-300 ${disableRules ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
                               <input
                                 type="checkbox"
                                 checked={stage.inheritScores === 1}
-                                disabled={isLocked}
+                                disabled={disableRules}
                                 onChange={(e) =>
                                   handleUpdateStageField(idx, 'inheritScores', e.target.checked ? 1 : 0)
                                 }
-                                className={`w-4 h-4 rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-0 ${
-                                  isLocked ? 'opacity-50 cursor-not-allowed' : ''
-                                }`}
+                                className="w-4 h-4 rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-0"
                               />
                               <span>继承底分</span>
                             </label>
@@ -324,8 +366,11 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                         </div>
                       </>
                     ) : (
-                      <div className="col-span-3 flex items-center pt-4 text-xs font-mono text-amber-300/80">
-                        前序所有直通者 + 最后一轮突围晋级者 汇聚决赛
+                      <div className="col-span-3 flex items-center pt-2">
+                        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] font-sans leading-relaxed">
+                          <span className="font-bold">🏆 20分登顶夺冠制：</span>
+                          累积达到 20 分获得赛点，随后拿下第 1 名即刻登顶夺冠；打满 8 局无人登顶则总分最高者夺冠。
+                        </div>
                       </div>
                     )}
                   </div>

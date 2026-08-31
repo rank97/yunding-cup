@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, RotateCcw, AlertTriangle, Crown, Sparkles, Dices } from 'lucide-react';
 import { Player } from '../types';
+import { useNotification } from '../context/NotificationContext';
 
 interface FastScoreModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const FastScoreModal: React.FC<FastScoreModalProps> = ({
   onSubmit,
   onReset,
 }) => {
+  const { confirmModal } = useNotification();
   const [ranks, setRanks] = useState<{ [playerId: string]: number | null }>({});
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -40,8 +42,6 @@ export const FastScoreModal: React.FC<FastScoreModalProps> = ({
       setErrorMsg(null);
     }
   }, [isOpen, players, existingRecords]);
-
-  if (!isOpen) return null;
 
   const handleSetRank = (playerId: string, rank: number) => {
     setRanks((prev) => {
@@ -112,7 +112,14 @@ export const FastScoreModal: React.FC<FastScoreModalProps> = ({
   };
 
   const handleReset = async () => {
-    if (!window.confirm('确定要作废/重置该局成绩吗？（重赛操作）')) return;
+    const confirmed = await confirmModal({
+      title: '确认作废该局成绩',
+      message: `确定要作废/重置【${groupName} 第 ${roundNumber} 局】的战绩吗？本局将被清空并恢复为待录入状态（支持重新比赛与填分）。`,
+      type: 'danger',
+      confirmText: '确认作废重赛',
+    });
+    if (!confirmed) return;
+
     try {
       setLoading(true);
       await onReset(matchRoundId);
@@ -123,6 +130,8 @@ export const FastScoreModal: React.FC<FastScoreModalProps> = ({
       setLoading(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">

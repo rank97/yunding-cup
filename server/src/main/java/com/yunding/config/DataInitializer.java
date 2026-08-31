@@ -47,6 +47,19 @@ public class DataInitializer implements CommandLineRunner {
             log.info(">>> 默认超管账号已初始化: admin / 123456");
         }
 
+        // 1.1 初始化默认普通主办方账号 (user / 123456)
+        User normalUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, "user"));
+        if (normalUser == null) {
+            normalUser = new User();
+            normalUser.setUsername("user");
+            normalUser.setPasswordHash(BCrypt.hashpw("123456"));
+            normalUser.setRole(Constants.ROLE_ORGANIZER);
+            normalUser.setCreatedAt(new Date());
+            normalUser.setUpdatedAt(new Date());
+            userMapper.insert(normalUser);
+            log.info(">>> 默认主办方账号已初始化: user / 123456");
+        }
+
         // 2. 如果数据库没有任何赛事，自动初始化一场 32 人示范赛
         Long count = tournamentMapper.selectCount(new LambdaQueryWrapper<Tournament>().eq(Tournament::getIsDeleted, 0));
         if (count == 0) {

@@ -1,6 +1,7 @@
 package com.yunding.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -21,4 +22,7 @@ public class Tournament implements Serializable {
     private Integer isDeleted;
     private Date createdAt;
     private Date updatedAt;
+
+    @TableField(exist = false)
+    private String creatorName;
 }
