@@ -67,7 +67,7 @@ export const TournamentListModal: React.FC<TournamentListModalProps> = ({
 
   const handleCopyLink = (t: Tournament, e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}/?share=${t.shareCode}`;
+    const url = `${window.location.origin}/?v=${t.shareCode}`;
     navigator.clipboard.writeText(url);
     setCopiedId(t.id);
     setTimeout(() => setCopiedId(null), 2000);

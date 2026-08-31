@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: jdbc:sqlite:data/yunding.db
+    driver-class-name: org.sqlite.JDBC
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-sqlite.sql
+      continue-on-error: true

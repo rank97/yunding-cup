@@ -106,19 +106,15 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
       setPlayers(pList || []);
 
       if (res.stages && res.stages.length > 0) {
-        const nav = getUrlNavState();
         let targetStageId = '';
-        if (nav.stage) {
-          const byOrder = res.stages.find((s: Stage) => String(s.stageOrder) === nav.stage || (nav.stage === 'final' && s.stageType === 'CHECKPOINT_FINAL'));
-          const byId = res.stages.find((s: Stage) => s.id === nav.stage);
-          if (byOrder) targetStageId = byOrder.id;
-          else if (byId) targetStageId = byId.id;
-        }
-        if (!targetStageId) {
-          const cur = res.stages.find((s: Stage) => s.id === res.tournament.currentStageId) || res.stages[0];
-          targetStageId = cur?.id || '';
-        }
-        setActiveStageId(targetStageId);
+        const cur = res.stages.find((s: Stage) => s.id === res.tournament.currentStageId) || res.stages[0];
+        targetStageId = cur?.id || '';
+        setActiveStageId((prev) => {
+          if (prev && res.stages.some((s: Stage) => s.id === prev)) {
+            return prev;
+          }
+          return targetStageId;
+        });
       }
       return res.tournament;
     } catch (e) {
@@ -150,11 +146,8 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
   useEffect(() => {
     if (tournament && activeStageId && tournament.shareCode) {
       fetchStageData(tournament.shareCode, activeStageId);
-      const stageObj = stages.find((s) => s.id === activeStageId);
-      const stageParam = stageObj ? String(stageObj.stageOrder) : activeStageId;
-      updateUrlNavState({ stage: stageParam });
     }
-  }, [tournament?.shareCode, activeStageId, stages, fetchStageData]);
+  }, [tournament?.shareCode, activeStageId, fetchStageData]);
 
   // 挂载后台 SSE 实时推流监听，录分或锁定时自动秒级刷新
   useEffect(() => {
@@ -514,7 +507,7 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
 
           <button
             onClick={() => {
-              const url = `${window.location.origin}/?share=${tournament.shareCode}`;
+              const url = `${window.location.origin}/?v=${tournament.shareCode}`;
               navigator.clipboard.writeText(url);
               toast.success('观赛大屏链接已成功复制到剪贴板！');
             }}

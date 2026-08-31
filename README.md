@@ -1,6 +1,32 @@
 # 🏆 云顶之弈电竞赛事管理系统 (TFT TourneyOS)
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Powered%20by-Google%20Gemini-8E75B2?style=flat-square&logo=google&logoColor=white" />
+  <img src="https://img.shields.io/badge/Java-17%2B-ED8B00?style=flat-square&logo=openjdk&logoColor=white" />
+  <img src="https://img.shields.io/badge/Spring%20Boot-3.2-6DB33F?style=flat-square&logo=springboot&logoColor=white" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black" />
+  <img src="https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite&logoColor=white" />
+  <img src="https://img.shields.io/badge/SQLite%20%2F%20MySQL-Dual%20Engine-003B57?style=flat-square&logo=sqlite&logoColor=white" />
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" />
+</p>
+
 现代化、全流程闭环的云顶之弈（TFT）多阶段锦标赛编排与实时观赛系统。支持多租户独立办赛、动态赛制流水线编排、8 人房间蛇形/随机分组、裁判极速比分录入、积分继承计算、20 分登顶决赛机制与实时大屏数据推流 (SSE)。
+
+> 🤖 **AI-Native 说明**：本项目全栈架构设计、前后端业务代码、动态赛程数学闭包算法、20分登顶制结赛状态机、暗夜电竞质感 UI 交互以及自动化 CI/CD 容器化流水线均由 **Google DeepMind 的 Gemini 大模型** 协作生成与全链路端到端调优构建。
+
+---
+
+## 📸 界面效果预览 (Screenshots)
+
+### 1. 全景赛程流水导图与巅峰冠军王座 (Spectator Mindmap)
+![全景赛程流水导图](docs/images/spectator-mindmap.png)
+
+### 2. 裁判录分与赛段流转管理工作台 (Admin Workbench)
+![裁判管理中台](docs/images/admin-workbench.png)
+
+### 3. 公开大厅与观赛码接入大门 (Spectator Gate)
+![观赛码接入大厅](docs/images/spectator-gate.png)
 
 ---
 
@@ -37,29 +63,76 @@
 
 ## 🛠️ 技术栈
 
-- **后端**：Java 17, Spring Boot 3.2, SQLite, MyBatis-Plus, Sa-Token, SSE (Server-Sent Events)
+- **后端**：Java 17, Spring Boot 3.2, SQLite / MySQL 双引擎支持, MyBatis-Plus, Sa-Token, SSE (Server-Sent Events)
 - **前端**：React 18, Vite, TypeScript, Tailwind CSS, Lucide Icons, Canvas Confetti
+- **容器与部署**：Docker, Docker Compose, Nginx
 
 ---
 
 ## 🚀 快速启动
 
-### 1. 后端启动 (Spring Boot)
+### 方案 A：单机极速启动 (默认 SQLite 免配置)
+
+#### 1. 后端启动 (Spring Boot)
 ```bash
 cd server
 export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-17.0.10.jdk/Contents/Home
 mvn clean compile
 mvn spring-boot:run
 ```
-后端服务默认运行在 `http://localhost:8080`。
+> **提示**：系统默认使用 SQLite 零配置数据库，首次启动将自动建表并加载初始账号与规则！
 
-### 2. 前端启动 (React + Vite)
+#### 2. 前端启动 (React + Vite)
 ```bash
 cd client
 npm install
 npm run dev
 ```
-前端开发服务默认运行在 `http://localhost:3000`。
+前端默认运行在 `http://localhost:3000`。
+
+---
+
+### 方案 B：生产级 MySQL 模式启动
+
+1. 在 MySQL 中创建数据库并执行初始化脚本：
+   * 结构脚本：[`sql/schema-mysql.sql`](file:///Users/rankai/www/yunding-cup/sql/schema-mysql.sql)
+   * 初始种子数据：[`sql/seed-data.sql`](file:///Users/rankai/www/yunding-cup/sql/seed-data.sql)
+2. 启动 Spring Boot 时指定 active profile 为 `mysql`：
+   ```bash
+   cd server
+   export SPRING_PROFILES_ACTIVE=mysql
+   export MYSQL_HOST=localhost
+   export MYSQL_PORT=3306
+   export MYSQL_DB=yunding_cup
+   export MYSQL_USER=root
+   export MYSQL_PASSWORD=your_password
+   mvn spring-boot:run
+   ```
+
+---
+
+### 方案 C：Docker 单镜像 (All-in-One) 极速运行
+
+整个系统支持多阶段打包为**单个轻量级全栈镜像**（内置前端静态资源、后端 API、SQLite 数据存储与 SSE 推流）：
+
+#### 方式 1：Docker Compose 一键启动
+```bash
+docker-compose up -d --build
+```
+
+#### 方式 2：本地编译并运行单镜像
+```bash
+docker build -t tft-tourneyos .
+docker run -d -p 8080:8080 -v $(pwd)/data:/app/data --name tft-tourneyos tft-tourneyos
+```
+
+#### 方式 3：从 GitHub Packages (GHCR) 直接拉取预编译镜像
+```bash
+docker run -d -p 8080:8080 -v $(pwd)/data:/app/data --name tft-tourneyos ghcr.io/rank97/yunding-cup:latest
+```
+容器启动后，浏览器直接打开 `http://localhost:8080` 即可使用！
+
+---
 
 ---
 

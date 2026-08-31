@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Trophy, 
   ShieldCheck, 
@@ -10,7 +10,9 @@ import {
   Radio, 
   PlusCircle,
   Users,
-  Layers
+  Layers,
+  ChevronDown,
+  Search
 } from 'lucide-react';
 import { User, Tournament } from '../types';
 
@@ -48,6 +50,30 @@ export const Navbar: React.FC<NavbarProps> = ({
   isSseConnected,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [tournamentSearch, setTournamentSearch] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  const currentAdminTournament = myTournaments.find((t) => t.id === adminTournamentId);
+
+  const filteredTournaments = myTournaments.filter((t) =>
+    t.title.toLowerCase().includes(tournamentSearch.toLowerCase()) ||
+    t.shareCode.toLowerCase().includes(tournamentSearch.toLowerCase())
+  );
 
   const activeShareCode = currentView === 'admin' 
     ? myTournaments.find((t) => t.id === adminTournamentId)?.shareCode
@@ -55,7 +81,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const handleCopyShareLink = () => {
     if (!activeShareCode) return;
-    const url = `${window.location.origin}/?share=${activeShareCode}`;
+    const url = `${window.location.origin}/?v=${activeShareCode}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -97,19 +123,134 @@ export const Navbar: React.FC<NavbarProps> = ({
             {currentView === 'admin' && currentUser ? (
               <>
                 {myTournaments.length > 0 && (
-                  <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-700/50 rounded-lg px-2.5 py-1">
-                    <span className="text-xs text-slate-400 hidden sm:inline">管理赛事:</span>
-                    <select
-                      value={adminTournamentId}
-                      onChange={(e) => onSelectAdminTournament(e.target.value)}
-                      className="bg-transparent text-sm font-semibold text-amber-300 focus:outline-none cursor-pointer max-w-[140px] sm:max-w-[180px] truncate"
+                  <div className="relative" ref={dropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsDropdownOpen((prev) => !prev)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${
+                        isDropdownOpen
+                          ? 'bg-slate-800/90 border-amber-500/60 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/40'
+                          : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-700/60 hover:border-amber-500/40'
+                      }`}
                     >
-                      {myTournaments.map((t) => (
-                        <option key={t.id} value={t.id} className="bg-slate-900 text-slate-100">
-                          {t.title} ({t.totalPlayers}人)
-                        </option>
-                      ))}
-                    </select>
+                      <span className="text-xs text-slate-400 font-medium hidden sm:inline">管理赛事:</span>
+                      
+                      <div className="flex items-center gap-1.5 max-w-[140px] sm:max-w-[200px] md:max-w-[280px]">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${
+                          currentAdminTournament?.status === 'IN_PROGRESS'
+                            ? 'bg-emerald-400 animate-pulse'
+                            : currentAdminTournament?.status === 'COMPLETED'
+                            ? 'bg-amber-400'
+                            : 'bg-slate-500'
+                        }`} />
+                        <span className="text-xs sm:text-sm font-bold text-amber-300 truncate">
+                          {currentAdminTournament?.title || '请选择赛事'}
+                        </span>
+                        {currentAdminTournament && (
+                          <span className="hidden lg:inline px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-600/20 text-purple-300 border border-purple-500/30 shrink-0">
+                            {currentAdminTournament.totalPlayers}人
+                          </span>
+                        )}
+                      </div>
+
+                      <ChevronDown className={`w-3.5 h-3.5 shrink-0 text-slate-400 transition-transform duration-200 ${
+                        isDropdownOpen ? 'rotate-180 text-amber-400' : ''
+                      }`} />
+                    </button>
+
+                    {/* Floating Custom Dropdown */}
+                    {isDropdownOpen && (
+                      <div className="absolute left-0 mt-2 w-72 sm:w-80 rounded-2xl bg-slate-900/95 border border-slate-700 shadow-2xl backdrop-blur-xl z-50 p-2 space-y-1.5 animate-in fade-in zoom-in-95 duration-150">
+                        {myTournaments.length > 3 && (
+                          <div className="relative mb-2">
+                            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={tournamentSearch}
+                              onChange={(e) => setTournamentSearch(e.target.value)}
+                              placeholder="搜索赛事名称或观赛码..."
+                              className="w-full pl-8 pr-2.5 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-amber-500/50"
+                              autoFocus
+                            />
+                          </div>
+                        )}
+
+                        <div className="max-h-60 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                          {filteredTournaments.length === 0 ? (
+                            <div className="py-4 text-center text-xs text-slate-500 font-mono">
+                              未找到匹配的赛事
+                            </div>
+                          ) : (
+                            filteredTournaments.map((t) => {
+                              const isSelected = t.id === adminTournamentId;
+                              return (
+                                <button
+                                  key={t.id}
+                                  type="button"
+                                  onClick={() => {
+                                    onSelectAdminTournament(t.id);
+                                    setIsDropdownOpen(false);
+                                  }}
+                                  className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between group ${
+                                    isSelected
+                                      ? 'bg-amber-500/15 border border-amber-500/40 text-amber-200 shadow-sm'
+                                      : 'hover:bg-slate-800/80 border border-transparent text-slate-300'
+                                  }`}
+                                >
+                                  <div className="min-w-0 pr-2 space-y-0.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                        t.status === 'IN_PROGRESS'
+                                          ? 'bg-emerald-400'
+                                          : t.status === 'COMPLETED'
+                                          ? 'bg-amber-400'
+                                          : 'bg-slate-500'
+                                      }`} />
+                                      <span className="font-bold text-xs truncate">
+                                        {t.title}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400 pl-3">
+                                      <span>{t.totalPlayers} 人赛</span>
+                                      <span>•</span>
+                                      <span>码: <span className="text-amber-400/90 font-bold">{t.shareCode}</span></span>
+                                      <span>•</span>
+                                      <span className={
+                                        t.status === 'IN_PROGRESS'
+                                          ? 'text-emerald-400'
+                                          : t.status === 'COMPLETED'
+                                          ? 'text-amber-300'
+                                          : 'text-slate-500'
+                                      }>
+                                        {t.status === 'IN_PROGRESS' ? '进行中' : t.status === 'COMPLETED' ? '已完赛' : '草稿'}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {isSelected && (
+                                    <Check className="w-4 h-4 text-amber-400 shrink-0" />
+                                  )}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+
+                        <div className="pt-1.5 border-t border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsDropdownOpen(false);
+                              onOpenTournamentList();
+                            }}
+                            className="w-full py-1.5 px-2 rounded-lg bg-slate-800/60 hover:bg-purple-950/40 hover:text-purple-300 border border-slate-700/50 text-slate-400 font-medium text-center transition-all flex items-center justify-center gap-1.5 text-xs"
+                          >
+                            <Layers className="w-3.5 h-3.5 text-purple-400" />
+                            <span>查看全部赛事大厅 ({myTournaments.length})</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

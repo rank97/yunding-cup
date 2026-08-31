@@ -19,34 +19,35 @@ interface SpectatorDashboardProps {
 }
 
 export const SpectatorDashboard: React.FC<SpectatorDashboardProps> = ({ shareCode }) => {
-  const initialNav = getUrlNavState();
   const [activeTab, setActiveTab] = useState<'mindmap' | 'details'>('mindmap');
   const [overview, setOverview] = useState<TournamentOverview | null>(null);
-  const [activeStageId, setActiveStageId] = useState<string>(initialNav.stage || '');
+  const [activeStageId, setActiveStageId] = useState<string>('');
   const [leaderboard, setLeaderboard] = useState<StageLeaderboard | null>(null);
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 载入大盘全景数据
+  // 载入大盘全景数据（策略 A：智能聚焦当前比赛赛段）
   const fetchOverview = useCallback(async () => {
     if (!shareCode) return;
     try {
       const data = await publicApi.getOverview(shareCode);
       setOverview(data);
 
-      const nav = getUrlNavState();
       let targetStageId = '';
-      if (nav.stage) {
-        const byOrder = data.columns.find((c) => String(c.stageOrder) === nav.stage || (nav.stage === 'final' && c.stageType === 'CHECKPOINT_FINAL'));
-        const byId = data.columns.find((c) => c.stageId === nav.stage);
-        if (byOrder) targetStageId = byOrder.stageId;
-        else if (byId) targetStageId = byId.stageId;
+      if (data.currentStageId && data.columns.some((c) => c.stageId === data.currentStageId)) {
+        targetStageId = data.currentStageId;
+      } else if (data.championThrone) {
+        targetStageId = data.columns[data.columns.length - 1]?.stageId || data.columns[0]?.stageId || '';
+      } else {
+        targetStageId = data.columns[0]?.stageId || '';
       }
-      if (!targetStageId) {
-        const currentCol = data.columns.find((c) => c.stageId === data.currentStageId) || data.columns[0];
-        targetStageId = currentCol?.stageId || '';
-      }
-      setActiveStageId(targetStageId);
+
+      setActiveStageId((prev) => {
+        if (prev && data.columns.some((c) => c.stageId === prev)) {
+          return prev;
+        }
+        return targetStageId;
+      });
     } catch (err: any) {
       console.error('Fetch overview error:', err);
     } finally {
@@ -76,11 +77,8 @@ export const SpectatorDashboard: React.FC<SpectatorDashboardProps> = ({ shareCod
   useEffect(() => {
     if (activeStageId) {
       fetchStageData(activeStageId);
-      const col = overview?.columns.find((c) => c.stageId === activeStageId);
-      const stageParam = col ? String(col.stageOrder) : activeStageId;
-      updateUrlNavState({ stage: stageParam });
     }
-  }, [activeStageId, overview, fetchStageData]);
+  }, [activeStageId, fetchStageData]);
 
   // 建立 SSE 实时推流监听
   useEffect(() => {
@@ -170,17 +168,6 @@ export const SpectatorDashboard: React.FC<SpectatorDashboardProps> = ({ shareCod
             <span>阶段排行榜与战报</span>
           </button>
         </div>
-
-        <button
-          onClick={() => {
-            fetchOverview();
-            if (activeStageId) fetchStageData(activeStageId);
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 text-xs text-slate-300 border border-slate-700 transition-colors"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>刷新数据</span>
-        </button>
       </div>
 
       {/* TAB 1: Left-to-Right Dynamic Overview Mindmap */}
