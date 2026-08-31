@@ -12,7 +12,8 @@ import {
   Users,
   Layers,
   ChevronDown,
-  Search
+  Search,
+  KeyRound
 } from 'lucide-react';
 import { User, Tournament } from '../types';
 
@@ -31,6 +32,7 @@ interface NavbarProps {
   spectatorTournamentTitle?: string;
   onExitSpectatorToGate?: () => void;
   isSseConnected: boolean;
+  onOpenChangePassword?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -48,6 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   spectatorTournamentTitle,
   onExitSpectatorToGate,
   isSseConnected,
+  onOpenChangePassword,
 }) => {
   const [copied, setCopied] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -68,15 +71,15 @@ export const Navbar: React.FC<NavbarProps> = ({
     };
   }, [isDropdownOpen]);
 
-  const currentAdminTournament = myTournaments.find((t) => t.id === adminTournamentId);
+  const currentAdminTournament = (myTournaments || []).find((t) => t.id === adminTournamentId);
 
-  const filteredTournaments = myTournaments.filter((t) =>
-    t.title.toLowerCase().includes(tournamentSearch.toLowerCase()) ||
-    t.shareCode.toLowerCase().includes(tournamentSearch.toLowerCase())
+  const filteredTournaments = (myTournaments || []).filter((t) =>
+    (t.title || '').toLowerCase().includes(tournamentSearch.toLowerCase()) ||
+    (t.shareCode || '').toLowerCase().includes(tournamentSearch.toLowerCase())
   );
 
   const activeShareCode = currentView === 'admin' 
-    ? myTournaments.find((t) => t.id === adminTournamentId)?.shareCode
+    ? currentAdminTournament?.shareCode
     : spectatorShareCode;
 
   const handleCopyShareLink = () => {
@@ -122,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center gap-2">
             {currentView === 'admin' && currentUser ? (
               <>
-                {myTournaments.length > 0 && (
+                {myTournaments && myTournaments.length > 0 && (
                   <div className="relative" ref={dropdownRef}>
                     <button
                       type="button"
@@ -283,7 +286,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900/60 border border-slate-800 text-xs font-mono text-slate-400">
+                <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs font-mono text-slate-400">
                   <Radio className="w-3 h-3 text-cyan-400 animate-pulse" />
                   <span>观赛码接入大厅</span>
                 </div>
@@ -380,6 +383,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {currentUser.role === 'SUPER_ADMIN' ? '超级管理员' : '赛事主办方'}
                 </div>
               </div>
+              {onOpenChangePassword && (
+                <button
+                  type="button"
+                  onClick={onOpenChangePassword}
+                  className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-amber-950/40 hover:text-amber-300 text-slate-400 transition-colors"
+                  title="修改登录密码"
+                >
+                  <KeyRound className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={onLogout}
                 className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-rose-950/40 hover:text-rose-400 text-slate-400 transition-colors"

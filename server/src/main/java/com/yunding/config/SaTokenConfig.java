@@ -19,11 +19,12 @@ public class SaTokenConfig implements WebMvcConfigurer {
         // 注册 Sa-Token 路由拦截器
         registry.addInterceptor(new SaInterceptor(handler -> {
             // 公开接口免登录
-            SaRouter.match("/api/v1/auth/**", r -> SaRouter.stop());
+            SaRouter.match("/api/v1/auth/login", r -> SaRouter.stop());
+            SaRouter.match("/api/v1/auth/register", r -> SaRouter.stop());
             SaRouter.match("/api/v1/public/**", r -> SaRouter.stop());
             SaRouter.match("/error", r -> SaRouter.stop());
 
-            // 其它所有管理接口均需登录
+            // 其它所有管理及认证修改接口均需登录
             SaRouter.match("/api/v1/**", r -> StpUtil.checkLogin());
         })).addPathPatterns("/**");
     }

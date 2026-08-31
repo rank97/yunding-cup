@@ -40,6 +40,7 @@ export const authApi = {
   login: (data: any): Promise<{ token: string; user: User }> => api.post('/auth/login', data),
   register: (data: any): Promise<User> => api.post('/auth/register', data),
   getInfo: (): Promise<User> => api.get('/auth/info'),
+  updatePassword: (data: { oldPassword: string; newPassword: string }): Promise<void> => api.put('/auth/password', data),
   logout: (): Promise<void> => api.post('/auth/logout'),
 };
 

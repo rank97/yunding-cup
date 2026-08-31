@@ -146,11 +146,13 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/app/data --name tft-tourneyos ghcr.io
 
 ## 📚 接口全景清单 (RESTful API & SSE)
 
-### 1. 认证接口 (`/api/v1/auth`)
+### 1. 认证与账号接口 (`/api/v1/auth`)
 | 方法 | 路径 | 权限 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/auth/login` | 公开 | 用户名密码登录（返回 Sa-Token） |
+| `POST` | `/api/v1/auth/register` | 公开 | 注册普通主办方账号（多租户独立空间） |
 | `GET` | `/api/v1/auth/info` | 需登录 | 获取当前登录用户信息与角色 |
+| `PUT` | `/api/v1/auth/password` | 需登录 | 修改当前登录账号的密码（需验证原密码） |
 | `POST` | `/api/v1/auth/logout` | 需登录 | 退出登录 |
 
 ### 2. 赛事管理接口 (`/api/v1/tournaments`)

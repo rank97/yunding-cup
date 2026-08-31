@@ -50,16 +50,22 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public User register(RegisterDTO dto) {
+        String username = dto.getUsername() != null ? dto.getUsername().trim() : "";
+        if ("admin".equalsIgnoreCase(username)) {
+            throw new BizException("无法使用系统保留的超管账号名称");
+        }
+
         Long count = userMapper.selectCount(new LambdaQueryWrapper<User>()
-                .eq(User::getUsername, dto.getUsername()));
+                .eq(User::getUsername, username));
         if (count > 0) {
             throw new BizException("用户名已存在");
         }
 
         User user = new User();
-        user.setUsername(dto.getUsername());
+        user.setUsername(username);
         user.setPasswordHash(BCrypt.hashpw(dto.getPassword()));
-        user.setRole(dto.getRole() != null ? dto.getRole() : Constants.ROLE_ORGANIZER);
+        // 注册用户严格限定为普通主办方角色，超级管理员仅限系统唯一内置 admin 账号
+        user.setRole(Constants.ROLE_ORGANIZER);
         user.setCreatedAt(new Date());
         user.setUpdatedAt(new Date());
         userMapper.insert(user);
@@ -80,5 +86,27 @@ public class AuthServiceImpl implements AuthService {
     public User getCurrentUser() {
         String userId = (String) StpUtil.getLoginId();
         return userMapper.selectById(userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePassword(com.yunding.dto.PasswordUpdateDTO dto) {
+        String userId = (String) StpUtil.getLoginId();
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException("用户不存在");
+        }
+
+        if (!BCrypt.checkpw(dto.getOldPassword(), user.getPasswordHash())) {
+            throw new BizException("当前原密码输入错误");
+        }
+
+        if (dto.getNewPassword().length() < 6) {
+            throw new BizException("新密码长度不能少于 6 位");
+        }
+
+        user.setPasswordHash(BCrypt.hashpw(dto.getNewPassword()));
+        user.setUpdatedAt(new Date());
+        userMapper.updateById(user);
     }
 }

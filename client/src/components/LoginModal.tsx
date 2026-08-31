@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Lock, User as UserIcon, Shield } from 'lucide-react';
 import { authApi } from '../services/api';
 import { User } from '../types';
@@ -15,13 +15,35 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   onSuccess,
 }) => {
   const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState('admin');
+  const [username, setUsername] = useState('user');
   const [password, setPassword] = useState('123456');
-  const [role, setRole] = useState<'SUPER_ADMIN' | 'ORGANIZER'>('SUPER_ADMIN');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 每次打开弹窗时重置所有状态，默认回归登录界面并清除所有历史错误
+  useEffect(() => {
+    if (isOpen) {
+      setIsRegister(false);
+      setUsername('user');
+      setPassword('123456');
+      setErrorMsg(null);
+      setLoading(false);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const handleToggleMode = (registerMode: boolean) => {
+    setIsRegister(registerMode);
+    setErrorMsg(null);
+    if (registerMode) {
+      setUsername('');
+      setPassword('');
+    } else {
+      setUsername('user');
+      setPassword('123456');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +51,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     try {
       setLoading(true);
       if (isRegister) {
-        await authApi.register({ username, password, role });
+        await authApi.register({ username, password });
         // 自动登录
         const res = await authApi.login({ username, password });
         localStorage.setItem('satoken', res.token);
@@ -55,7 +77,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-purple-400" />
             <h3 className="font-extrabold text-base text-slate-100">
-              {isRegister ? '注册主办方账号' : '主办方 / 超管登录'}
+              {isRegister ? '注册主办方账号 (独立办赛)' : '主办方 / 超管登录'}
             </h3>
           </div>
           <button
@@ -104,16 +126,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </div>
 
           {isRegister && (
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">角色权限</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-purple-500"
-              >
-                <option value="ORGANIZER">赛事主办方 (多租户隔离)</option>
-                <option value="SUPER_ADMIN">超级管理员 (全局管控)</option>
-              </select>
+            <div className="p-2.5 rounded-xl bg-purple-950/40 border border-purple-800/40 text-[11px] text-purple-300 space-y-1">
+              <div className="font-semibold flex items-center gap-1">
+                <span>🛡️</span> 注册提示：
+              </div>
+              <div className="text-slate-400">
+                新注册账号默认为 <span className="text-purple-300 font-bold">赛事主办方</span> 权限，系统将自动分配专属独立办赛空间与标准积分规则。超级管理员仅限系统内置 admin 账号。
+              </div>
             </div>
           )}
 
@@ -130,7 +149,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           {isRegister ? '已有账号？' : '首次使用系统？'}
           <button
             type="button"
-            onClick={() => setIsRegister(!isRegister)}
+            onClick={() => handleToggleMode(!isRegister)}
             className="text-purple-400 hover:text-purple-300 font-semibold ml-1 underline"
           >
             {isRegister ? '去登录' : '创建新账号'}

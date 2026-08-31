@@ -34,6 +34,12 @@ public class AuthController {
         return Result.success(authService.getCurrentUser());
     }
 
+    @PutMapping("/password")
+    public Result<?> updatePassword(@RequestBody @Valid com.yunding.dto.PasswordUpdateDTO dto) {
+        authService.updatePassword(dto);
+        return Result.success();
+    }
+
     @PostMapping("/logout")
     public Result<?> logout() {
         StpUtil.logout();

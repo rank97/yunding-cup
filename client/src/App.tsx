@@ -6,11 +6,12 @@ import { AdminWorkbench } from './pages/AdminWorkbench';
 import { TournamentBuilderModal } from './components/TournamentBuilderModal';
 import { TournamentListModal } from './components/TournamentListModal';
 import { LoginModal } from './components/LoginModal';
+import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { authApi, tournamentApi, publicApi } from './services/api';
 import { User, Tournament } from './types';
 import { getUrlNavState, updateUrlNavState } from './services/urlState';
 
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, Trophy, RefreshCw } from 'lucide-react';
 
 export const App: React.FC = () => {
   const initialNav = getUrlNavState();
@@ -20,6 +21,7 @@ export const App: React.FC = () => {
   // 1. 公开赛事列表（用于观赛大厅/观赛码选择）与当前大屏观赛分享码（游客与登录用户均可任意观看）
   const [publicTournaments, setPublicTournaments] = useState<Tournament[]>([]);
   const [spectatorShareCode, setSpectatorShareCode] = useState<string>(initialNav.share || '');
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
 
   // 2. 当前登录用户有权限管理的赛事列表与当前管理中的赛事 ID
   const [myTournaments, setMyTournaments] = useState<Tournament[]>([]);
@@ -29,6 +31,7 @@ export const App: React.FC = () => {
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [isTournamentListOpen, setIsTournamentListOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isSseConnected, setIsSseConnected] = useState(false);
 
   // 获取公开赛事列表（供大屏观赛与首页快捷卡片）
@@ -36,8 +39,22 @@ export const App: React.FC = () => {
     try {
       const list = await publicApi.listTournaments();
       setPublicTournaments(list);
+
+      // 智能默认选择：如果未在 URL 中指定观赛码且系统存在比赛，自动载入最新/进行中的公开赛事
+      setSpectatorShareCode((prev) => {
+        if (prev) return prev;
+        const initialShare = getUrlNavState().share;
+        if (initialShare) return initialShare;
+        if (list.length > 0) {
+          const activeT = list.find((t) => t.status === 'IN_PROGRESS') || list[0];
+          return activeT.shareCode;
+        }
+        return '';
+      });
     } catch (e) {
       console.error('Fetch public tournaments error:', e);
+    } finally {
+      setIsInitialLoading(false);
     }
   }, []);
 
@@ -255,11 +272,17 @@ export const App: React.FC = () => {
         spectatorTournamentTitle={spectatorTournamentTitle}
         onExitSpectatorToGate={handleExitSpectatorToGate}
         isSseConnected={isSseConnected}
+        onOpenChangePassword={() => setIsChangePasswordOpen(true)}
       />
 
       {/* Main Content Area */}
       <main className="flex-1">
-        {currentView === 'spectator' ? (
+        {isInitialLoading ? (
+          <div className="min-h-[70vh] flex flex-col items-center justify-center gap-3 animate-in fade-in duration-200">
+            <RefreshCw className="w-8 h-8 text-purple-400 animate-spin" />
+            <span className="text-xs font-mono text-slate-400">正在接入赛事全景系统...</span>
+          </div>
+        ) : currentView === 'spectator' ? (
           spectatorShareCode ? (
             <SpectatorDashboard shareCode={spectatorShareCode} />
           ) : (
@@ -344,6 +367,11 @@ export const App: React.FC = () => {
           fetchMyTournaments();
           fetchPublicTournaments();
         }}
+      />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
       />
     </div>
   );
