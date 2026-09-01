@@ -121,8 +121,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Context Header: Admin Tournament Switcher vs Spectator Info */}
-          <div className="flex items-center gap-2">
+          {/* Context Header: Admin Tournament Switcher vs Spectator Info (Desktop only) */}
+          <div className="hidden md:flex items-center gap-2">
             {currentView === 'admin' && currentUser ? (
               <>
                 {myTournaments && myTournaments.length > 0 && (
@@ -295,8 +295,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Center: Main View Switcher Tabs */}
-        <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-700/60 shadow-inner">
+        {/* Center: Main View Switcher Tabs (Desktop only) */}
+        <div className="hidden md:flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-700/60 shadow-inner">
           <button
             onClick={() => setCurrentView('spectator')}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
@@ -327,8 +327,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Right: Live Indicator, Share Link, User Profile */}
-        <div className="flex items-center gap-3">
+        {/* Right: Live Indicator, Share Link, User Profile (Desktop only) */}
+        <div className="hidden md:flex items-center gap-3">
           {/* SSE Live Indicator */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900/60 border border-slate-700/50">
             <span className="relative flex h-2 w-2">
@@ -363,7 +363,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {/* Create Tournament CTA for Organizers */}
+          {/* Create Tournament CTA for Organizers (Desktop only) */}
           {currentUser && (
             <button
               onClick={onOpenCreateTournament}

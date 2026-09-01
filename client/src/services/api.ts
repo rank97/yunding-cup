@@ -85,6 +85,7 @@ export const matchApi = {
 // Public Spectator
 export const publicApi = {
   listTournaments: (): Promise<Tournament[]> => api.get('/public/tournaments'),
+  listScoreRules: (): Promise<ScoreRule[]> => api.get('/public/score-rules'),
   getOverview: (shareCode: string): Promise<TournamentOverview> =>
     api.get(`/public/tournaments/${shareCode}/overview`),
   getLeaderboard: (shareCode: string, stageId: string): Promise<StageLeaderboard> =>

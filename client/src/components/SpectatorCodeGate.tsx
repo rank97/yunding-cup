@@ -147,8 +147,8 @@ export const SpectatorCodeGate: React.FC<SpectatorCodeGateProps> = ({
           )}
         </div>
 
-        {/* Footer Admin Entry */}
-        <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+        {/* Footer Admin Entry (Desktop only) */}
+        <div className="hidden md:flex items-center justify-center gap-2 text-xs text-slate-500">
           <span>我是赛事主办方或裁判？</span>
           <button
             type="button"

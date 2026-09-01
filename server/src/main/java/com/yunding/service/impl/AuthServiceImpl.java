@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.yunding.common.BizException;
 import com.yunding.common.Constants;
 import com.yunding.dto.LoginDTO;
+import com.yunding.dto.PasswordUpdateDTO;
 import com.yunding.dto.RegisterDTO;
 import com.yunding.entity.ScoreRule;
 import com.yunding.entity.User;
@@ -18,6 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
+/**
+ * 用户认证与账号管理业务实现类
+ *
+ * @author TFT-TourneyOS Team
+ */
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -25,6 +31,9 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final ScoreRuleMapper scoreRuleMapper;
 
+    /**
+     * 用户账号登录认证
+     */
     @Override
     public Map<String, Object> login(LoginDTO dto) {
         User user = userMapper.selectOne(new LambdaQueryWrapper<User>()
@@ -37,6 +46,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BizException("密码错误");
         }
 
+        // Sa-Token 会话登录并持久化角色与用户名
         StpUtil.login(user.getId());
         StpUtil.getSession().set("role", user.getRole());
         StpUtil.getSession().set("username", user.getUsername());
@@ -47,6 +57,9 @@ public class AuthServiceImpl implements AuthService {
         return map;
     }
 
+    /**
+     * 主办方自主注册
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public User register(RegisterDTO dto) {
@@ -70,7 +83,7 @@ public class AuthServiceImpl implements AuthService {
         user.setUpdatedAt(new Date());
         userMapper.insert(user);
 
-        // 创建系统默认积分规则给该用户
+        // 为新注册主办方初始化分配一套系统标准默认积分规则 (8-7-6-5-4-3-2-1)
         ScoreRule defaultRule = new ScoreRule();
         defaultRule.setTenantId(user.getId());
         defaultRule.setRuleName("系统标准积分规则 (8-1分)");
@@ -82,15 +95,21 @@ public class AuthServiceImpl implements AuthService {
         return user;
     }
 
+    /**
+     * 获取当前登录会话的用户信息
+     */
     @Override
     public User getCurrentUser() {
         String userId = (String) StpUtil.getLoginId();
         return userMapper.selectById(userId);
     }
 
+    /**
+     * 修改当前登录账号的密码
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updatePassword(com.yunding.dto.PasswordUpdateDTO dto) {
+    public void updatePassword(PasswordUpdateDTO dto) {
         String userId = (String) StpUtil.getLoginId();
         User user = userMapper.selectById(userId);
         if (user == null) {
@@ -98,11 +117,11 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (!BCrypt.checkpw(dto.getOldPassword(), user.getPasswordHash())) {
-            throw new BizException("当前原密码输入错误");
+            throw new BizException("旧密码输入错误，修改失败");
         }
 
-        if (dto.getNewPassword().length() < 6) {
-            throw new BizException("新密码长度不能少于 6 位");
+        if (dto.getNewPassword().equals(dto.getOldPassword())) {
+            throw new BizException("新密码不能与旧密码相同");
         }
 
         user.setPasswordHash(BCrypt.hashpw(dto.getNewPassword()));

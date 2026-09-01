@@ -37,6 +37,7 @@ export interface Stage {
   inheritScores: number; // 0 or 1
   maxRoundLimit?: number;
   scoreRuleId?: string;
+  scoreRuleName?: string;
   status: 'PENDING' | 'GROUPED' | 'IN_PROGRESS' | 'COMPLETED' | 'LOCKED';
 }
 
@@ -80,6 +81,8 @@ export interface StageColumn {
   directToFinalCount: number;
   eliminateCount: number;
   inheritScores: number;
+  scoreRuleId?: string;
+  scoreRuleName?: string;
   status: 'PENDING' | 'GROUPED' | 'IN_PROGRESS' | 'COMPLETED' | 'LOCKED';
   groups: GroupNode[];
 }
@@ -133,6 +136,8 @@ export interface StageLeaderboard {
   directToFinalCount: number;
   eliminateCount: number;
   inheritScores: number;
+  scoreRuleId?: string;
+  scoreRuleName?: string;
   status: string;
   rows: LeaderboardRow[];
 }

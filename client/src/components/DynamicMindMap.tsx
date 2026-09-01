@@ -131,6 +131,13 @@ export const DynamicMindMap: React.FC<DynamicMindMapProps> = ({
 
                     {/* Stage Meta Badges */}
                     <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400 font-mono">
+                      <span className={`px-2 py-0.5 rounded border ${
+                        col.scoreRuleId === '2'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold'
+                          : 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+                      }`}>
+                        {col.scoreRuleId === '2' ? '9分加权制' : '8分标准制'}
+                      </span>
                       <span className="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700">
                         {col.roundCount} 局赛制
                       </span>

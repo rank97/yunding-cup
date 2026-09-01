@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { SpectatorDashboard } from './pages/SpectatorDashboard';
+import { MobileSpectatorDashboard } from './pages/MobileSpectatorDashboard';
 import { SpectatorCodeGate } from './components/SpectatorCodeGate';
 import { AdminWorkbench } from './pages/AdminWorkbench';
 import { TournamentBuilderModal } from './components/TournamentBuilderModal';
@@ -10,10 +11,12 @@ import { ChangePasswordModal } from './components/ChangePasswordModal';
 import { authApi, tournamentApi, publicApi } from './services/api';
 import { User, Tournament } from './types';
 import { getUrlNavState, updateUrlNavState } from './services/urlState';
+import { useIsMobile } from './hooks/useIsMobile';
 
 import { ShieldAlert, Trophy, RefreshCw } from 'lucide-react';
 
 export const App: React.FC = () => {
+  const isMobile = useIsMobile();
   const initialNav = getUrlNavState();
   const [currentView, setCurrentView] = useState<'spectator' | 'admin'>(initialNav.view || 'spectator');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -241,6 +244,23 @@ export const App: React.FC = () => {
   const spectatorTournamentTitle = publicTournaments.find(
     (t) => t.shareCode.toUpperCase() === spectatorShareCode.toUpperCase()
   )?.title;
+
+  const handleLoginSuccess = (u: User) => {
+    setCurrentUser(u);
+    fetchMyTournaments();
+    fetchPublicTournaments();
+  };
+
+  // 移动端专属观赛大屏渲染分支（当且仅当移动端处于观赛大屏状态且指定了观赛码）
+  if (isMobile && currentView === 'spectator' && spectatorShareCode) {
+    return (
+      <MobileSpectatorDashboard
+        shareCode={spectatorShareCode}
+        onExitToGate={handleExitSpectatorToGate}
+        isSseConnected={isSseConnected}
+      />
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-[#0b0d1b] text-slate-100 selection:bg-purple-600 selection:text-white">

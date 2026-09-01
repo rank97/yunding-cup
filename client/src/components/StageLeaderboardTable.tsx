@@ -149,6 +149,13 @@ export const StageLeaderboardTable: React.FC<StageLeaderboardTableProps> = ({
           <h3 className="font-extrabold text-base text-slate-100">
             {leaderboard.stageName} - 阶段实时总积分榜
           </h3>
+          <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold border ${
+            leaderboard.scoreRuleId === '2'
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              : 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+          }`}>
+            {leaderboard.scoreRuleId === '2' ? '9-7-6-5-4-3-2-1 吃鸡加权' : '8-7-6-5-4-3-2-1 官方标准'}
+          </span>
           <span className="text-xs text-slate-400 font-mono hidden sm:inline">
             (共 <span className="text-amber-300 font-bold">{rows.length}</span> 位选手 ｜ 比赛 {roundCount} 局)
           </span>

@@ -421,9 +421,10 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
 
   const handleUpdateTournament = async (tId: string, data: any) => {
     await tournamentApi.update(tId, data);
-    await fetchTournamentData();
-    if (tournament && activeStageId) {
-      await fetchStageData(tournament.shareCode, activeStageId);
+    const updated = await fetchTournamentData();
+    const sc = updated?.shareCode || tournament?.shareCode;
+    if (sc && activeStageId) {
+      await fetchStageData(sc, activeStageId);
     }
   };
 
@@ -735,6 +736,7 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
           roundNumber={activeRoundData.roundNumber}
           players={activeRoundData.players}
           existingRecords={activeRoundData.records}
+          scoreRuleId={currentStage?.scoreRuleId || '1'}
           onSubmit={handleScoreSubmit}
           onReset={handleScoreReset}
         />

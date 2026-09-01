@@ -29,6 +29,7 @@ public class PublicServiceImpl implements PublicService {
     private final StageGroupPlayerMapper stageGroupPlayerMapper;
     private final MatchRoundMapper matchRoundMapper;
     private final GameRecordMapper gameRecordMapper;
+    private final ScoreRuleMapper scoreRuleMapper;
     private final SseEmitterManager sseEmitterManager;
 
     @Override
@@ -36,6 +37,12 @@ public class PublicServiceImpl implements PublicService {
         return tournamentMapper.selectList(new LambdaQueryWrapper<Tournament>()
                 .eq(Tournament::getIsDeleted, 0)
                 .orderByDesc(Tournament::getCreatedAt));
+    }
+
+    @Override
+    public List<ScoreRule> listScoreRules() {
+        return scoreRuleMapper.selectList(new LambdaQueryWrapper<ScoreRule>()
+                .orderByAsc(ScoreRule::getId));
     }
 
     @Override
@@ -65,6 +72,8 @@ public class PublicServiceImpl implements PublicService {
 
         List<TournamentOverviewVO.StageColumnVO> columns = new ArrayList<>();
         List<String> matchPointCandidateNames = new ArrayList<>();
+        Map<String, String> scoreRuleMap = scoreRuleMapper.selectList(null).stream()
+                .collect(Collectors.toMap(ScoreRule::getId, ScoreRule::getRuleName, (k1, k2) -> k1));
 
         for (int i = 0; i < stages.size(); i++) {
             Stage stage = stages.get(i);
@@ -77,6 +86,8 @@ public class PublicServiceImpl implements PublicService {
             col.setDirectToFinalCount(stage.getDirectToFinalCount());
             col.setEliminateCount(stage.getEliminateCount());
             col.setInheritScores(stage.getInheritScores());
+            col.setScoreRuleId(stage.getScoreRuleId() != null ? stage.getScoreRuleId() : "1");
+            col.setScoreRuleName(scoreRuleMap.getOrDefault(stage.getScoreRuleId(), "官方标准积分规则 (8-7-6-5-4-3-2-1)"));
             col.setStatus(stage.getStatus());
 
             List<StageGroup> groups = stageGroupMapper.selectList(new LambdaQueryWrapper<StageGroup>()
@@ -209,6 +220,9 @@ public class PublicServiceImpl implements PublicService {
         vo.setDirectToFinalCount(stage.getDirectToFinalCount());
         vo.setEliminateCount(stage.getEliminateCount());
         vo.setInheritScores(stage.getInheritScores());
+        vo.setScoreRuleId(stage.getScoreRuleId() != null ? stage.getScoreRuleId() : "1");
+        ScoreRule currentRule = stage.getScoreRuleId() != null ? scoreRuleMapper.selectById(stage.getScoreRuleId()) : null;
+        vo.setScoreRuleName(currentRule != null ? currentRule.getRuleName() : "官方标准积分规则 (8-7-6-5-4-3-2-1)");
         vo.setStatus(stage.getStatus());
 
         List<StagePlayerState> states = stagePlayerStateMapper.selectList(new LambdaQueryWrapper<StagePlayerState>()
