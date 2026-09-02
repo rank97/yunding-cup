@@ -94,7 +94,7 @@ export const TournamentListModal: React.FC<TournamentListModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
       <div className="w-full max-w-5xl glass-panel rounded-2xl border-purple-500/40 p-6 shadow-2xl space-y-5 max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">

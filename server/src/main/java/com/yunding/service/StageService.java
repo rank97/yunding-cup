@@ -29,6 +29,24 @@ public interface StageService {
     List<Player> listPlayers(String tournamentId);
 
     /**
+     * 单独添加一位参赛选手
+     *
+     * @param tournamentId 赛事 ID
+     * @param name         选手姓名
+     * @param gameId       游戏内 ID
+     * @param avatarUrl    选手头像 URL
+     * @return 新增的 Player 实体
+     */
+    Player addPlayer(String tournamentId, String name, String gameId, String avatarUrl);
+
+    /**
+     * 删除指定参赛选手
+     *
+     * @param playerId 选手 ID
+     */
+    void deletePlayer(String playerId);
+
+    /**
      * 修改单个选手的姓名、游戏内 ID 或头像
      *
      * @param playerId  选手 ID

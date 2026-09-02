@@ -407,6 +407,127 @@ public class PublicServiceImpl implements PublicService {
         return sseEmitterManager.createEmitter(shareCode);
     }
 
+    @Override
+    public Map<String, Object> getSignupInfo(String shareCode) {
+        Tournament tournament = tournamentMapper.selectOne(new LambdaQueryWrapper<Tournament>()
+                .eq(Tournament::getShareCode, shareCode)
+                .eq(Tournament::getIsDeleted, 0));
+        if (tournament == null) {
+            throw new BizException("赛事不存在或已被删除");
+        }
+
+        List<Stage> stages = stageMapper.selectList(new LambdaQueryWrapper<Stage>()
+                .eq(Stage::getTournamentId, tournament.getId())
+                .eq(Stage::getIsDeleted, 0)
+                .orderByAsc(Stage::getStageOrder));
+
+        List<Player> players = playerMapper.selectList(new LambdaQueryWrapper<Player>()
+                .eq(Player::getTournamentId, tournament.getId())
+                .orderByAsc(Player::getInitialSeed));
+
+        int totalPlayers = tournament.getTotalPlayers();
+        int registeredCount = players.size();
+        int remainingSlots = Math.max(0, totalPlayers - registeredCount);
+
+        boolean isDraft = Constants.TOURNAMENT_DRAFT.equals(tournament.getStatus());
+        boolean firstStagePending = !stages.isEmpty() && Constants.STAGE_PENDING.equals(stages.get(0).getStatus());
+        boolean isOpen = isDraft && firstStagePending && registeredCount < totalPlayers;
+        boolean isFull = registeredCount >= totalPlayers;
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("tournament", tournament);
+        result.put("stages", stages);
+        result.put("players", players);
+        result.put("totalPlayers", totalPlayers);
+        result.put("registeredCount", registeredCount);
+        result.put("remainingSlots", remainingSlots);
+        result.put("isOpen", isOpen);
+        result.put("isFull", isFull);
+        return result;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    public Player publicSignup(String shareCode, String name, String gameId, String avatarUrl) {
+        Tournament tournament = tournamentMapper.selectOne(new LambdaQueryWrapper<Tournament>()
+                .eq(Tournament::getShareCode, shareCode)
+                .eq(Tournament::getIsDeleted, 0));
+        if (tournament == null) {
+            throw new BizException("赛事不存在或已被删除");
+        }
+
+        if (!Constants.TOURNAMENT_DRAFT.equals(tournament.getStatus())) {
+            throw new BizException("该赛事已正式开赛或已结束，报名通道已关闭！");
+        }
+
+        List<Stage> stages = stageMapper.selectList(new LambdaQueryWrapper<Stage>()
+                .eq(Stage::getTournamentId, tournament.getId())
+                .eq(Stage::getIsDeleted, 0)
+                .orderByAsc(Stage::getStageOrder));
+
+        if (!stages.isEmpty() && !Constants.STAGE_PENDING.equals(stages.get(0).getStatus())) {
+            throw new BizException("第 1 赛段已生成分组或已开赛，报名通道已关闭！");
+        }
+
+        List<Player> existing = playerMapper.selectList(new LambdaQueryWrapper<Player>()
+                .eq(Player::getTournamentId, tournament.getId()));
+
+        if (existing.size() >= tournament.getTotalPlayers()) {
+            throw new BizException(String.format("手慢了！该赛事参赛名额已达上限 (%d/%d 人)，报名已满额！", existing.size(), tournament.getTotalPlayers()));
+        }
+
+        if (name == null || name.trim().isEmpty()) {
+            throw new BizException("请输入选手昵称或真实姓名");
+        }
+        if (gameId == null || gameId.trim().isEmpty()) {
+            throw new BizException("请输入游戏内 ID (如: 虎牙丶红莲#1234)");
+        }
+
+        String finalName = name.trim();
+        String finalGameId = gameId.trim();
+
+        // 重复报名校验
+        boolean duplicate = existing.stream().anyMatch(p -> p.getName().equalsIgnoreCase(finalName)
+                || p.getGameId().equalsIgnoreCase(finalGameId));
+        if (duplicate) {
+            throw new BizException(String.format("选手【%s】或游戏ID【%s】已在该赛事名单中，请勿重复报名！", finalName, finalGameId));
+        }
+
+        Player p = new Player();
+        p.setTournamentId(tournament.getId());
+        p.setName(finalName);
+        p.setGameId(finalGameId);
+        p.setAvatarUrl(avatarUrl != null && !avatarUrl.trim().isEmpty() ? avatarUrl.trim() : null);
+        p.setInitialSeed(existing.size() + 1);
+        p.setCreatedAt(new Date());
+        playerMapper.insert(p);
+
+        // 如果第一赛段处于 PENDING 状态，自动为新选手插入 StagePlayerState
+        if (!stages.isEmpty()) {
+            Stage firstStage = stages.get(0);
+            StagePlayerState state = new StagePlayerState();
+            state.setStageId(firstStage.getId());
+            state.setPlayerId(p.getId());
+            state.setCarryOverScore(0);
+            state.setStageScore(0);
+            state.setTotalScore(0);
+            state.setFirstPlaceCount(0);
+            state.setTop4Count(0);
+            state.setAdvancementStatus(Constants.ADVANCE_NONE);
+            state.setIsMatchPoint(0);
+            stagePlayerStateMapper.insert(state);
+        }
+
+        // SSE 广播通知：大屏和管理员工作台实时接收新报名选手
+        sseEmitterManager.broadcast(tournament.getShareCode(), "PLAYER_REGISTERED", Map.of(
+                "player", p,
+                "registeredCount", existing.size() + 1,
+                "totalPlayers", tournament.getTotalPlayers()
+        ));
+
+        return p;
+    }
+
     private int calculateExpectedInputPlayers(List<Stage> stages, int stageIndex, int totalPlayers) {
         int current = totalPlayers;
         for (int i = 0; i < stageIndex; i++) {

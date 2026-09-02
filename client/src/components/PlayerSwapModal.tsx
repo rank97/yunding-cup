@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ArrowLeftRight, Users, Check, AlertCircle, Info, RefreshCw } from 'lucide-react';
 import { stageApi } from '../services/api';
 
@@ -117,9 +118,9 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-xl glass-panel rounded-2xl border-purple-500/40 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <div className="w-full max-w-xl bg-[#0e1326] rounded-2xl border border-purple-500/40 p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
@@ -310,6 +311,7 @@ export const PlayerSwapModal: React.FC<PlayerSwapModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

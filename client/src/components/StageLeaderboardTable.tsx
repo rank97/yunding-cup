@@ -428,9 +428,20 @@ export const StageLeaderboardTable: React.FC<StageLeaderboardTableProps> = ({
                       )}
                     </td>
 
-                    {/* Name */}
+                    {/* Name & Avatar */}
                     <td className="py-3 px-4 font-bold text-slate-100">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
+                        {row.avatarUrl ? (
+                          <img
+                            src={row.avatarUrl}
+                            alt=""
+                            className="w-6 h-6 rounded-full object-cover border border-slate-700 bg-slate-900 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-700/60 flex items-center justify-center text-[10px] text-purple-300 font-bold shrink-0">
+                            {row.name.charAt(0)}
+                          </div>
+                        )}
                         <span>{row.name}</span>
                         {isMatchPoint && (
                           <span 

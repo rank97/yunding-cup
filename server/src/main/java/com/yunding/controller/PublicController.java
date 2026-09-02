@@ -86,6 +86,32 @@ public class PublicController {
     }
 
     /**
+     * 获取指定赛事的公开报名概况与选手花名册信息
+     *
+     * @param shareCode 8 位观赛分享码
+     * @return 报名概况详情 Map
+     */
+    @GetMapping("/tournaments/{shareCode}/signup-info")
+    public Result<java.util.Map<String, Object>> getSignupInfo(@PathVariable String shareCode) {
+        return Result.success(publicService.getSignupInfo(shareCode));
+    }
+
+    /**
+     * 选手自主在线公开报名参赛
+     *
+     * @param shareCode 8 位观赛分享码
+     * @param body      报名请求体 (name, gameId, avatarUrl)
+     * @return 报名成功的选手实体
+     */
+    @PostMapping("/tournaments/{shareCode}/signup")
+    public Result<com.yunding.entity.Player> publicSignup(@PathVariable String shareCode, @RequestBody java.util.Map<String, String> body) {
+        String name = body.get("name");
+        String gameId = body.get("gameId");
+        String avatarUrl = body.get("avatarUrl");
+        return Result.success(publicService.publicSignup(shareCode, name, gameId, avatarUrl));
+    }
+
+    /**
      * 订阅赛事专属的 Server-Sent Events (SSE) 实时推流
      * <p>
      * 裁判录入比分、赛段分组、赛段锁定完赛时，服务端将毫秒级向所有连接的观赛客户端广播更新事件。

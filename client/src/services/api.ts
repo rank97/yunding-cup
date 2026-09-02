@@ -58,6 +58,9 @@ export const tournamentApi = {
 export const stageApi = {
   importPlayers: (tournamentId: string, players: any[]): Promise<void> =>
     api.post(`/tournaments/${tournamentId}/players/batch`, { players }),
+  addPlayer: (tournamentId: string, data: { name: string; gameId?: string; avatarUrl?: string }): Promise<Player> =>
+    api.post(`/tournaments/${tournamentId}/players`, data),
+  deletePlayer: (playerId: string): Promise<void> => api.delete(`/players/${playerId}`),
   listPlayers: (tournamentId: string): Promise<Player[]> => api.get(`/tournaments/${tournamentId}/players`),
   updatePlayer: (playerId: string, data: { name?: string; gameId?: string; avatarUrl?: string }): Promise<Player> =>
     api.put(`/players/${playerId}`, data),
@@ -82,7 +85,7 @@ export const matchApi = {
   resetRound: (roundId: string): Promise<void> => api.delete(`/match-rounds/${roundId}/records`),
 };
 
-// Public Spectator
+// Public Spectator & Self-Signup
 export const publicApi = {
   listTournaments: (): Promise<Tournament[]> => api.get('/public/tournaments'),
   listScoreRules: (): Promise<ScoreRule[]> => api.get('/public/score-rules'),
@@ -94,6 +97,10 @@ export const publicApi = {
     api.get(`/public/tournaments/${shareCode}/stages/${stageId}/leaderboard`),
   getGroupDetails: (shareCode: string, stageId: string): Promise<GroupDetails> =>
     api.get(`/public/tournaments/${shareCode}/stages/${stageId}/group-details`),
+  getSignupInfo: (shareCode: string): Promise<any> =>
+    api.get(`/public/tournaments/${shareCode}/signup-info`),
+  publicSignup: (shareCode: string, data: { name: string; gameId: string; avatarUrl?: string }): Promise<Player> =>
+    api.post(`/public/tournaments/${shareCode}/signup`, data),
   createEventSource: (shareCode: string): EventSource => {
     return new EventSource(`/api/v1/public/tournaments/${shareCode}/stream`);
   },

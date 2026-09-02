@@ -58,6 +58,29 @@ public class StageServiceImpl implements StageService {
         checkTournamentPermission(stage.getTournamentId());
     }
 
+    private static final String[] PRESET_AVATARS = {
+            "https://api.dicebear.com/7.x/adventurer/svg?seed=PenguKnight&backgroundColor=b6e3f4",
+            "https://api.dicebear.com/7.x/adventurer/svg?seed=ChibiYasuo&backgroundColor=ffdfbf",
+            "https://api.dicebear.com/7.x/lorelei/svg?seed=StarGuardianAhri&backgroundColor=ffd5dc",
+            "https://api.dicebear.com/7.x/bottts/svg?seed=ProjectMecha&backgroundColor=c0aede",
+            "https://api.dicebear.com/7.x/bottts/svg?seed=CyberAgent&backgroundColor=b6e3f4",
+            "https://api.dicebear.com/7.x/lorelei/svg?seed=MoonSorceress&backgroundColor=d1d4f9",
+            "https://api.dicebear.com/7.x/adventurer/svg?seed=DragonLord&backgroundColor=ffdfbf",
+            "https://api.dicebear.com/7.x/adventurer/svg?seed=ShadowNinja&backgroundColor=c0aede",
+            "https://api.dicebear.com/7.x/pixel-art/svg?seed=PixelMage&backgroundColor=b6e3f4",
+            "https://api.dicebear.com/7.x/pixel-art/svg?seed=PixelHero&backgroundColor=ffd5dc",
+            "https://api.dicebear.com/7.x/fun-emoji/svg?seed=CuteDango&backgroundColor=ffd5dc",
+            "https://api.dicebear.com/7.x/fun-emoji/svg?seed=FuryHorn&backgroundColor=b6e3f4"
+    };
+
+    private String getAutoAvatar(String name, int index) {
+        if (name != null && !name.trim().isEmpty()) {
+            int hash = Math.abs(name.hashCode());
+            return PRESET_AVATARS[hash % PRESET_AVATARS.length];
+        }
+        return PRESET_AVATARS[Math.abs(index) % PRESET_AVATARS.length];
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void importPlayers(PlayerBatchImportDTO dto) {
@@ -98,7 +121,11 @@ public class StageServiceImpl implements StageService {
             p.setTournamentId(tournament.getId());
             p.setName(item.getName());
             p.setGameId(item.getGameId());
-            p.setAvatarUrl(item.getAvatarUrl());
+            String avatar = item.getAvatarUrl();
+            if (avatar == null || avatar.trim().isEmpty()) {
+                avatar = getAutoAvatar(item.getName(), i);
+            }
+            p.setAvatarUrl(avatar);
             p.setInitialSeed(item.getInitialSeed() != null ? item.getInitialSeed() : (i + 1));
             p.setCreatedAt(new Date());
             playerMapper.insert(p);
@@ -124,6 +151,130 @@ public class StageServiceImpl implements StageService {
                 state.setIsMatchPoint(0);
                 stagePlayerStateMapper.insert(state);
             }
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Player addPlayer(String tournamentId, String name, String gameId, String avatarUrl) {
+        checkTournamentPermission(tournamentId);
+        Tournament tournament = tournamentMapper.selectById(tournamentId);
+        if (tournament == null || tournament.getIsDeleted() == 1) {
+            throw new BizException("赛事不存在");
+        }
+
+        if (!Constants.TOURNAMENT_DRAFT.equals(tournament.getStatus())) {
+            throw new BizException("赛事已开赛或已完赛，不可添加新选手！");
+        }
+
+        List<Stage> stages = stageMapper.selectList(new LambdaQueryWrapper<Stage>()
+                .eq(Stage::getTournamentId, tournamentId)
+                .eq(Stage::getIsDeleted, 0)
+                .orderByAsc(Stage::getStageOrder));
+
+        for (Stage s : stages) {
+            if (!Constants.STAGE_PENDING.equals(s.getStatus())) {
+                throw new BizException("赛段已生成分组或已开赛，不可添加新选手！");
+            }
+        }
+
+        List<Player> existing = playerMapper.selectList(new LambdaQueryWrapper<Player>()
+                .eq(Player::getTournamentId, tournamentId));
+
+        if (existing.size() >= tournament.getTotalPlayers()) {
+            throw new BizException(String.format("选手数量已达到赛事设定上限 (%d人)", tournament.getTotalPlayers()));
+        }
+
+        if (name == null || name.trim().isEmpty()) {
+            throw new BizException("选手姓名不能为空");
+        }
+
+        String finalName = name.trim();
+        String finalGameId = gameId != null ? gameId.trim() : "";
+
+        // 校验重复
+        boolean duplicate = existing.stream().anyMatch(p -> p.getName().equalsIgnoreCase(finalName)
+                || (!finalGameId.isEmpty() && finalGameId.equalsIgnoreCase(p.getGameId())));
+        if (duplicate) {
+            throw new BizException(String.format("选手【%s】或游戏ID【%s】已存在于该赛事名册中，请勿重复添加！", finalName, finalGameId));
+        }
+
+        Player p = new Player();
+        p.setTournamentId(tournamentId);
+        p.setName(finalName);
+        p.setGameId(finalGameId);
+        String finalAvatar = avatarUrl;
+        if (finalAvatar == null || finalAvatar.trim().isEmpty()) {
+            finalAvatar = getAutoAvatar(finalName, existing.size());
+        }
+        p.setAvatarUrl(finalAvatar);
+        p.setInitialSeed(existing.size() + 1);
+        p.setCreatedAt(new Date());
+        playerMapper.insert(p);
+
+        // 如果第一赛段处于 PENDING 状态，自动为新选手插入 StagePlayerState
+        if (!stages.isEmpty()) {
+            Stage firstStage = stages.get(0);
+            StagePlayerState state = new StagePlayerState();
+            state.setStageId(firstStage.getId());
+            state.setPlayerId(p.getId());
+            state.setCarryOverScore(0);
+            state.setStageScore(0);
+            state.setTotalScore(0);
+            state.setFirstPlaceCount(0);
+            state.setTop4Count(0);
+            state.setAdvancementStatus(Constants.ADVANCE_NONE);
+            state.setIsMatchPoint(0);
+            stagePlayerStateMapper.insert(state);
+        }
+
+        sseEmitterManager.broadcast(tournament.getShareCode(), "PLAYER_ADDED", p);
+        return p;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deletePlayer(String playerId) {
+        Player p = playerMapper.selectById(playerId);
+        if (p == null) {
+            throw new BizException("选手不存在");
+        }
+        checkTournamentPermission(p.getTournamentId());
+
+        Tournament tournament = tournamentMapper.selectById(p.getTournamentId());
+        if (tournament != null && !Constants.TOURNAMENT_DRAFT.equals(tournament.getStatus())) {
+            throw new BizException("赛事已开赛或已完赛，不可删除选手！");
+        }
+
+        List<Stage> stages = stageMapper.selectList(new LambdaQueryWrapper<Stage>()
+                .eq(Stage::getTournamentId, p.getTournamentId())
+                .eq(Stage::getIsDeleted, 0));
+
+        for (Stage s : stages) {
+            if (!Constants.STAGE_PENDING.equals(s.getStatus())) {
+                throw new BizException("赛段已生成分组或已锁定，不可删除选手！");
+            }
+        }
+
+        // 删除 stage_player_states
+        stagePlayerStateMapper.delete(new LambdaQueryWrapper<StagePlayerState>()
+                .eq(StagePlayerState::getPlayerId, playerId));
+
+        // 删除 players 记录
+        playerMapper.deleteById(playerId);
+
+        // 重新编号种子顺位
+        List<Player> remaining = playerMapper.selectList(new LambdaQueryWrapper<Player>()
+                .eq(Player::getTournamentId, p.getTournamentId())
+                .orderByAsc(Player::getInitialSeed));
+        for (int i = 0; i < remaining.size(); i++) {
+            Player rem = remaining.get(i);
+            rem.setInitialSeed(i + 1);
+            playerMapper.updateById(rem);
+        }
+
+        if (tournament != null) {
+            sseEmitterManager.broadcast(tournament.getShareCode(), "PLAYER_DELETED", Map.of("playerId", playerId));
         }
     }
 

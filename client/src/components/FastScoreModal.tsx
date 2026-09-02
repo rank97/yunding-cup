@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check, RotateCcw, AlertTriangle, Crown, Sparkles, Swords, Info } from 'lucide-react';
 import { Player } from '../types';
 import { useNotification } from '../context/NotificationContext';
@@ -149,9 +150,9 @@ export const FastScoreModal: React.FC<FastScoreModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fade-in">
-      <div className="w-full max-w-2xl bg-slate-900 border border-purple-500/40 rounded-2xl p-6 shadow-2xl shadow-purple-950/50 space-y-5 my-6 max-h-[92vh] flex flex-col">
+  return createPortal(
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fade-in">
+      <div className="w-full max-w-2xl bg-[#0e1326] border border-purple-500/40 rounded-2xl p-6 shadow-2xl shadow-purple-950/50 space-y-5 my-6 max-h-[92vh] flex flex-col">
         {/* 1. Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-3.5 shrink-0">
           <div className="flex items-center gap-3">
@@ -408,6 +409,7 @@ export const FastScoreModal: React.FC<FastScoreModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

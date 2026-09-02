@@ -8,6 +8,7 @@ import com.yunding.vo.TournamentOverviewVO;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 公开观赛与大屏实时推流业务接口
@@ -63,4 +64,23 @@ public interface PublicService {
      * @return SseEmitter 实例
      */
     SseEmitter createSseEmitter(String shareCode);
+
+    /**
+     * 获取指定赛事的公开报名概况与选手名册信息
+     *
+     * @param shareCode 8 位观赛分享码
+     * @return 报名概况详情 Map
+     */
+    Map<String, Object> getSignupInfo(String shareCode);
+
+    /**
+     * 选手自主在线公开报名参赛
+     *
+     * @param shareCode 8 位观赛分享码
+     * @param name      选手姓名 / 参赛称呼
+     * @param gameId    游戏内 ID
+     * @param avatarUrl 选手头像 URL
+     * @return 报名成功的选手实体
+     */
+    com.yunding.entity.Player publicSignup(String shareCode, String name, String gameId, String avatarUrl);
 }

@@ -4,6 +4,7 @@ import { SpectatorDashboard } from './pages/SpectatorDashboard';
 import { MobileSpectatorDashboard } from './pages/MobileSpectatorDashboard';
 import { SpectatorCodeGate } from './components/SpectatorCodeGate';
 import { AdminWorkbench } from './pages/AdminWorkbench';
+import { PlayerSignupPage } from './pages/PlayerSignupPage';
 import { TournamentBuilderModal } from './components/TournamentBuilderModal';
 import { TournamentListModal } from './components/TournamentListModal';
 import { LoginModal } from './components/LoginModal';
@@ -18,12 +19,13 @@ import { ShieldAlert, Trophy, RefreshCw } from 'lucide-react';
 export const App: React.FC = () => {
   const isMobile = useIsMobile();
   const initialNav = getUrlNavState();
-  const [currentView, setCurrentView] = useState<'spectator' | 'admin'>(initialNav.view || 'spectator');
+  const [currentView, setCurrentView] = useState<'spectator' | 'admin' | 'signup'>(initialNav.view || 'spectator');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // 1. 公开赛事列表（用于观赛大厅/观赛码选择）与当前大屏观赛分享码（游客与登录用户均可任意观看）
   const [publicTournaments, setPublicTournaments] = useState<Tournament[]>([]);
   const [spectatorShareCode, setSpectatorShareCode] = useState<string>(initialNav.share || '');
+  const [signupShareCode, setSignupShareCode] = useState<string>(initialNav.signupShareCode || initialNav.share || '');
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
 
   // 2. 当前登录用户有权限管理的赛事列表与当前管理中的赛事 ID
@@ -251,6 +253,17 @@ export const App: React.FC = () => {
     fetchPublicTournaments();
   };
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const nav = getUrlNavState();
+      if (nav.view) setCurrentView(nav.view);
+      if (nav.share) setSpectatorShareCode(nav.share);
+      if (nav.signupShareCode) setSignupShareCode(nav.signupShareCode);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // 移动端专属观赛大屏渲染分支（当且仅当移动端处于观赛大屏状态且指定了观赛码）
   if (isMobile && currentView === 'spectator' && spectatorShareCode) {
     return (
@@ -262,24 +275,70 @@ export const App: React.FC = () => {
     );
   }
 
+  // 独立全屏渲染分支：选手自主报名页（纯净独立电竞落地页，不加载全局管理员菜单与顶部Banner）
+  if (currentView === 'signup') {
+    return (
+      <PlayerSignupPage
+        shareCode={signupShareCode || spectatorShareCode}
+        onNavigateToSpectate={(sc) => {
+          setSpectatorShareCode(sc);
+          setCurrentView('spectator');
+          updateUrlNavState({ view: 'spectator', share: sc });
+        }}
+        onNavigateHome={() => {
+          setCurrentView('spectator');
+          setSpectatorShareCode('');
+          updateUrlNavState({ view: 'spectator', share: undefined });
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-[100dvh] flex flex-col bg-[#0b0d1b] text-slate-100 selection:bg-purple-600 selection:text-white">
       {/* Navigation Bar */}
       <Navbar
         currentView={currentView}
         setCurrentView={(view) => {
-          if (view === 'admin' && !currentUser) {
-            setIsLoginOpen(true);
-            return;
+          if (view === 'admin') {
+            if (!currentUser) {
+              setIsLoginOpen(true);
+              return;
+            }
+            if (spectatorShareCode) {
+              const matchingAdminT = myTournaments.find(
+                (t) => t.shareCode.toUpperCase() === spectatorShareCode.toUpperCase()
+              );
+              if (matchingAdminT) {
+                setAdminTournamentId(matchingAdminT.id);
+              }
+            }
+          } else if (view === 'spectator') {
+            // 从管理后台切到观赛大屏时，自动无缝同步当前正在管理的比赛
+            if (adminTournamentId) {
+              const currentAdminT = myTournaments.find((t) => t.id === adminTournamentId);
+              if (currentAdminT && currentAdminT.shareCode) {
+                setSpectatorShareCode(currentAdminT.shareCode);
+                updateUrlNavState({ share: currentAdminT.shareCode });
+              }
+            }
           }
           setCurrentView(view);
+          updateUrlNavState({ view });
         }}
         currentUser={currentUser}
         onOpenLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
         myTournaments={myTournaments}
         adminTournamentId={adminTournamentId}
-        onSelectAdminTournament={(id) => setAdminTournamentId(id)}
+        onSelectAdminTournament={(id) => {
+          setAdminTournamentId(id);
+          const target = myTournaments.find((t) => t.id === id);
+          if (target && target.shareCode) {
+            setSpectatorShareCode(target.shareCode);
+            updateUrlNavState({ share: target.shareCode });
+          }
+        }}
         onOpenCreateTournament={() => {
           if (!currentUser) {
             setIsLoginOpen(true);
@@ -359,6 +418,10 @@ export const App: React.FC = () => {
         selectedTournamentId={adminTournamentId}
         onSelectTournament={(id) => {
           setAdminTournamentId(id);
+          const target = myTournaments.find((t) => t.id === id);
+          if (target && target.shareCode) {
+            setSpectatorShareCode(target.shareCode);
+          }
           setCurrentView('admin');
           updateUrlNavState({ view: 'admin' });
         }}

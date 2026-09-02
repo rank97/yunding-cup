@@ -410,6 +410,19 @@ export const MobileSpectatorDashboard: React.FC<MobileSpectatorDashboardProps> =
                           )}
                         </div>
 
+                        {/* Avatar */}
+                        {row.avatarUrl ? (
+                          <img
+                            src={row.avatarUrl}
+                            alt=""
+                            className="w-8 h-8 rounded-xl object-cover border border-slate-700 bg-slate-950 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-xl bg-purple-950/80 border border-purple-700/60 flex items-center justify-center text-xs text-purple-300 font-bold shrink-0">
+                            {row.name.charAt(0)}
+                          </div>
+                        )}
+
                         {/* Player name, game ID, and badges */}
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">

@@ -34,7 +34,9 @@ import {
   ChevronRight,
   ArrowLeftRight,
   Settings,
-  Trash2
+  Trash2,
+  ExternalLink,
+  Tv
 } from 'lucide-react';
 
 import { getUrlNavState, updateUrlNavState } from '../services/urlState';
@@ -178,6 +180,27 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
       });
 
       eventSource.addEventListener('STAGE_UNLOCKED', () => {
+        fetchTournamentData();
+        if (activeStageId) fetchStageData(tournament.shareCode, activeStageId);
+      });
+
+      eventSource.addEventListener('PLAYER_REGISTERED', () => {
+        fetchTournamentData();
+        if (activeStageId) fetchStageData(tournament.shareCode, activeStageId);
+        toast.info('有新选手通过公开链接完成报名！');
+      });
+
+      eventSource.addEventListener('PLAYER_ADDED', () => {
+        fetchTournamentData();
+        if (activeStageId) fetchStageData(tournament.shareCode, activeStageId);
+      });
+
+      eventSource.addEventListener('PLAYER_DELETED', () => {
+        fetchTournamentData();
+        if (activeStageId) fetchStageData(tournament.shareCode, activeStageId);
+      });
+
+      eventSource.addEventListener('PLAYER_UPDATED', () => {
         fetchTournamentData();
         if (activeStageId) fetchStageData(tournament.shareCode, activeStageId);
       });
@@ -352,8 +375,24 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
     toast.success('选手名册已成功导入！');
   };
 
-  const handleUpdateSinglePlayer = async (pId: string, name: string, gameId: string) => {
-    await stageApi.updatePlayer(pId, { name, gameId });
+  const handleAddSinglePlayer = async (tId: string, data: { name: string; gameId: string; avatarUrl?: string }) => {
+    await stageApi.addPlayer(tId, data);
+    await fetchTournamentData();
+    if (tournament && activeStageId) {
+      await fetchStageData(tournament.shareCode, activeStageId);
+    }
+  };
+
+  const handleDeleteSinglePlayer = async (pId: string) => {
+    await stageApi.deletePlayer(pId);
+    await fetchTournamentData();
+    if (tournament && activeStageId) {
+      await fetchStageData(tournament.shareCode, activeStageId);
+    }
+  };
+
+  const handleUpdateSinglePlayer = async (pId: string, name: string, gameId: string, avatarUrl?: string) => {
+    await stageApi.updatePlayer(pId, { name, gameId, avatarUrl });
     await fetchTournamentData();
     if (tournament && activeStageId) {
       await fetchStageData(tournament.shareCode, activeStageId);
@@ -479,43 +518,52 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
                 {tournament.totalPlayers} 人赛规
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1 font-mono">
-              公开观赛分享码: <span className="text-amber-300 font-bold">{tournament.shareCode}</span> ｜ 
-              选手已录入: <span className={players.length === tournament.totalPlayers ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                {players.length} / {tournament.totalPlayers}
-              </span> 人
-            </p>
+            <div className="flex flex-wrap items-center gap-2 mt-1.5 font-mono text-xs sm:text-sm">
+              <span className="px-3 py-1 rounded-xl bg-purple-950/80 border border-purple-700/70 text-purple-200 flex items-center gap-1.5 shadow-sm">
+                <Tv className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span className="text-slate-300 font-bold">公开观赛分享码:</span>
+                <span className="text-amber-300 font-black tracking-wider">{tournament.shareCode}</span>
+              </span>
+              <span className="px-3 py-1 rounded-xl bg-slate-900/90 border border-slate-700/80 text-slate-300">
+                选手录入: <span className={players.length === tournament.totalPlayers ? 'text-emerald-400 font-black' : 'text-rose-400 font-black'}>
+                  {players.length} / {tournament.totalPlayers}
+                </span> 人
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <button
             onClick={() => setIsEditTournamentOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0"
           >
-            <Settings className="w-4 h-4 text-purple-400" />
-            <span>编辑赛事与赛程</span>
+            <Settings className="w-4 h-4 text-purple-400 shrink-0" />
+            <span className="whitespace-nowrap">编辑赛事与赛程</span>
           </button>
 
           <button
             onClick={() => setIsPlayerModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-bold transition-all flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0"
           >
-            <Users className="w-4 h-4 text-purple-400" />
-            <span>{players.length === 0 ? '录入选手名册' : '修改选手名单'}</span>
+            <Users className="w-4 h-4 text-purple-400 shrink-0" />
+            <span className="whitespace-nowrap">{players.length === 0 ? '录入选手名册' : '修改选手名单'}</span>
           </button>
 
           <button
             onClick={() => {
-              const url = `${window.location.origin}/?v=${tournament.shareCode}`;
-              navigator.clipboard.writeText(url);
-              toast.success('观赛大屏链接已成功复制到剪贴板！');
+              const signupUrl = `${window.location.origin}/signup/${tournament.shareCode}`;
+              const spectatorUrl = `${window.location.origin}/?v=${tournament.shareCode}`;
+              const text = `🏆【${tournament.title}】云顶之弈锦标赛参赛报名开启！\n\n📌 赛事规模：${tournament.totalPlayers} 人\n👉 选手报名链接：${signupUrl}\n📺 观赛大屏链接：${spectatorUrl}\n\n名额有限，先到先得！快来报名参赛吧！`;
+              navigator.clipboard.writeText(text);
+              toast.success('比赛分享文案已复制！包含选手报名与观赛大屏链接，可直接粘贴分享！');
             }}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all flex items-center gap-1.5"
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-purple-600/20 hover:from-amber-500/30 hover:to-purple-600/30 text-amber-300 border border-amber-400/40 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap shrink-0"
+            title="一键复制包含报名链接与观赛大屏链接的比赛分享文案"
           >
-            <Share2 className="w-4 h-4" />
-            <span>复制观赛大屏链接</span>
+            <Share2 className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="whitespace-nowrap">分享比赛</span>
           </button>
 
           {onDeleteTournament && (
@@ -540,11 +588,11 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
                   });
                 }
               }}
-              className="px-3 py-2 rounded-xl bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 text-xs font-bold transition-all flex items-center gap-1.5"
+              className="px-3 py-2 rounded-xl bg-rose-950/30 hover:bg-rose-900/50 text-rose-300 border border-rose-500/30 text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0"
               title="删除当前比赛"
             >
-              <Trash2 className="w-4 h-4 text-rose-400" />
-              <span>删除赛事</span>
+              <Trash2 className="w-4 h-4 text-rose-400 shrink-0" />
+              <span className="whitespace-nowrap">删除赛事</span>
             </button>
           )}
         </div>
@@ -694,25 +742,33 @@ export const AdminWorkbench: React.FC<AdminWorkbenchProps> = ({
       )}
 
       {/* Tournament Edit Modal */}
-      <TournamentEditModal
-        isOpen={isEditTournamentOpen}
-        onClose={() => setIsEditTournamentOpen(false)}
-        tournament={tournament}
-        stages={stages}
-        onUpdate={handleUpdateTournament}
-      />
+      {tournament && (
+        <TournamentEditModal
+          isOpen={isEditTournamentOpen}
+          onClose={() => setIsEditTournamentOpen(false)}
+          tournament={tournament}
+          stages={stages}
+          onUpdate={handleUpdateTournament}
+        />
+      )}
 
       {/* Player Import / Edit Modal */}
-      <PlayerImportModal
-        isOpen={isPlayerModalOpen}
-        onClose={() => setIsPlayerModalOpen(false)}
-        tournamentId={tournament.id}
-        totalPlayers={tournament.totalPlayers}
-        isLocked={tournament.status !== 'DRAFT' || stages.some((s) => s.status !== 'PENDING')}
-        currentPlayers={players}
-        onImport={handlePlayersImport}
-        onUpdateSinglePlayer={handleUpdateSinglePlayer}
-      />
+      {tournament && (
+        <PlayerImportModal
+          isOpen={isPlayerModalOpen}
+          onClose={() => setIsPlayerModalOpen(false)}
+          tournamentId={tournament.id}
+          shareCode={tournament.shareCode}
+          tournamentTitle={tournament.title}
+          totalPlayers={tournament.totalPlayers}
+          isLocked={tournament.status !== 'DRAFT' || stages.some((s) => s.status !== 'PENDING')}
+          currentPlayers={players}
+          onImport={handlePlayersImport}
+          onAddSinglePlayer={handleAddSinglePlayer}
+          onUpdateSinglePlayer={handleUpdateSinglePlayer}
+          onDeleteSinglePlayer={handleDeleteSinglePlayer}
+        />
+      )}
 
       {/* Player Swap Fine-Tuning Modal */}
       <PlayerSwapModal

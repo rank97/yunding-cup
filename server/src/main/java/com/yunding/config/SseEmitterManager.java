@@ -66,7 +66,7 @@ public class SseEmitterManager {
             for (SseEmitter emitter : entry.getValue()) {
                 try {
                     emitter.send(SseEmitter.event().name("HEARTBEAT").data("ping"));
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     removeEmitter(shareCode, emitter);
                 }
             }
@@ -89,7 +89,7 @@ public class SseEmitterManager {
         for (SseEmitter emitter : emitters) {
             try {
                 emitter.send(SseEmitter.event().name(eventName).data(data));
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 removeEmitter(shareCode, emitter);
             }
         }
@@ -99,6 +99,10 @@ public class SseEmitterManager {
      * 移除失效或关闭的 SSE 连接
      */
     private void removeEmitter(String shareCode, SseEmitter emitter) {
+        try {
+            emitter.complete();
+        } catch (Throwable ignored) {
+        }
         CopyOnWriteArrayList<SseEmitter> list = emitterMap.get(shareCode);
         if (list != null) {
             list.remove(emitter);

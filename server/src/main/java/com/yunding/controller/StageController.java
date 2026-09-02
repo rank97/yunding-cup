@@ -57,6 +57,35 @@ public class StageController {
     }
 
     /**
+     * 单独添加一位参赛选手
+     *
+     * @param tournamentId 赛事 ID
+     * @param body         包含 name, gameId, avatarUrl 的请求体
+     * @return 新增的选手实体
+     */
+    @PostMapping("/tournaments/{tournamentId}/players")
+    @SaCheckLogin
+    public Result<Player> addPlayer(@PathVariable String tournamentId, @RequestBody Map<String, String> body) {
+        String name = body.get("name");
+        String gameId = body.get("gameId");
+        String avatarUrl = body.get("avatarUrl");
+        return Result.success(stageService.addPlayer(tournamentId, name, gameId, avatarUrl));
+    }
+
+    /**
+     * 删除指定参赛选手
+     *
+     * @param playerId 选手 ID
+     * @return 操作成功结果
+     */
+    @DeleteMapping("/players/{playerId}")
+    @SaCheckLogin
+    public Result<?> deletePlayer(@PathVariable String playerId) {
+        stageService.deletePlayer(playerId);
+        return Result.success();
+    }
+
+    /**
      * 修改单个选手的姓名、游戏内 ID 或头像
      *
      * @param playerId 选手 ID

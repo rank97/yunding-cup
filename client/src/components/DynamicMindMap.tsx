@@ -246,10 +246,17 @@ export const DynamicMindMap: React.FC<DynamicMindMapProps> = ({
                                     : 'bg-slate-800/40 border-slate-700/60 text-slate-200 hover:bg-slate-800'
                                 }`}
                               >
-                                <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
                                   <span className="font-mono text-xs text-slate-400 w-4 shrink-0 font-bold">
                                     #{slot.seedIndex}
                                   </span>
+                                  {slot.avatarUrl && (
+                                    <img
+                                      src={slot.avatarUrl}
+                                      alt=""
+                                      className="w-5 h-5 rounded-md object-cover border border-slate-700 bg-slate-950 shrink-0"
+                                    />
+                                  )}
                                   <span className="font-bold text-slate-100 text-xs truncate" title={slot.name}>
                                     {slot.name}
                                   </span>
@@ -353,7 +360,14 @@ export const DynamicMindMap: React.FC<DynamicMindMapProps> = ({
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
                     <span>登顶加冕 · 巅峰总冠军</span>
                   </div>
-                  <div className="text-xl font-black text-amber-200 mt-1.5 tracking-tight">
+                  {championThrone.championAvatarUrl && (
+                    <img
+                      src={championThrone.championAvatarUrl}
+                      alt=""
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400/80 mx-auto my-2.5 shadow-lg shadow-amber-500/30 bg-slate-950"
+                    />
+                  )}
+                  <div className="text-xl font-black text-amber-200 mt-1 tracking-tight">
                     {championThrone.championName}
                   </div>
                   <div className="text-xs text-amber-400/80 font-mono mt-0.5">

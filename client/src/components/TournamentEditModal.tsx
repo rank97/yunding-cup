@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Settings, Check, AlertTriangle, Lock, Sparkles, Layers, ShieldAlert, Crown, Trophy, Users, Pencil } from 'lucide-react';
 import { Tournament, Stage } from '../types';
 import { useNotification } from '../context/NotificationContext';
@@ -66,9 +67,9 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
 
   // 数学闭包实时校验
   useEffect(() => {
-    if (!isOpen || draftStages.length === 0) return;
+    if (!isOpen || !tournament || draftStages.length === 0) return;
 
-    let current = tournament.totalPlayers;
+    let current = tournament.totalPlayers || 0;
     let directTotal = 0;
 
     for (let i = 0; i < draftStages.length; i++) {
@@ -164,12 +165,11 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !tournament) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-4xl glass-panel rounded-2xl border-purple-500/40 p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200 custom-scrollbar">
-        {/* Header */}
+  return createPortal(
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      <div className="w-full max-w-4xl bg-[#0e1326] rounded-2xl border border-purple-500/40 p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200 custom-scrollbar">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
             <h3 className="font-extrabold text-lg text-slate-100 flex items-center gap-2">
@@ -180,16 +180,12 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
               已生成分组或已完赛的赛段不可修改晋级规则（需先清除分组）；总决赛固定为 20 分登顶制（8分标准，最高 8 局）
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200"
-          >
+          <button onClick={onClose} className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Basic Meta Form (同一行并列) */}
-        <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80">
+        <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-300 flex items-center gap-1.5">
@@ -197,43 +193,27 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                 <span>赛事标题</span>
                 <span className="text-rose-400">*</span>
               </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700/80 text-slate-100 text-sm focus:outline-none focus:border-purple-500 font-medium h-[38px]"
-              />
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-purple-500 font-medium h-[38px]" />
             </div>
-
             <div className="space-y-1.5 min-w-0">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-400 flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-purple-400" />
                   <span>参赛总规模 (已锁定)</span>
                 </label>
-                <span className="text-[10px] font-mono text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800 shrink-0">
+                <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 shrink-0">
                   {tournament.totalPlayers} 人 ({tournament.totalPlayers / 8} 房)
                 </span>
               </div>
-              <input
-                type="text"
-                disabled
-                value={`${tournament.totalPlayers} 人 (${tournament.totalPlayers / 8} 个独立 8 人房间)`}
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-500 text-sm cursor-not-allowed font-mono h-[38px]"
-              />
+              <input type="text" disabled value={`${tournament.totalPlayers} 人 (${tournament.totalPlayers / 8} 个独立 8 人房间)`} className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-500 text-sm cursor-not-allowed font-mono h-[38px]" />
             </div>
           </div>
         </div>
 
-        {/* Stages Config List */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-extrabold text-slate-300">
-              赛段规则明细配置 ({draftStages.length} 个赛段)
-            </span>
-            <span className="text-[11px] text-slate-500">
-              各赛段总人数必须保持 8 的整数倍流转
-            </span>
+            <span className="text-xs font-extrabold text-slate-300">赛段规则明细配置 ({draftStages.length} 个赛段)</span>
+            <span className="text-[11px] text-slate-500">各赛段总人数必须保持 8 的整数倍流转</span>
           </div>
 
           <div className="space-y-3">
@@ -241,194 +221,86 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
               const isFinal = idx === draftStages.length - 1;
               const disableRules = stage.isGrouped;
               const ruleId = stage.scoreRuleId || '1';
-
               return (
-                <div
-                  key={stage.id || idx}
-                  className={`p-4 rounded-2xl border transition-all ${
-                    isFinal
-                      ? 'glass-panel-gold border-amber-500/50'
-                      : stage.isGrouped
-                      ? 'bg-slate-900/40 border-slate-800/80'
-                      : 'bg-slate-900/70 border-slate-800'
-                  }`}
-                >
-                  {/* Stage Card Header */}
+                <div key={stage.id || idx} className={`p-4 rounded-2xl border transition-all ${isFinal ? 'bg-gradient-to-br from-amber-950/70 via-slate-900 to-slate-900 border-amber-500/50' : stage.isGrouped ? 'bg-slate-950/70 border-slate-800/80' : 'bg-slate-900 border-slate-800'}`}>
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-2.5 border-b border-slate-800/80">
-                    {/* Left: Index badge + Click-to-Edit Stage Name */}
                     <div className="flex items-center gap-2.5 flex-1 min-w-[200px] max-w-sm">
-                      <span
-                        className={`w-7 h-7 rounded-lg text-xs font-mono font-bold flex items-center justify-center shrink-0 shadow-sm ${
-                          isFinal ? 'bg-amber-400 text-slate-950' : 'bg-purple-600 text-white'
-                        }`}
-                      >
-                        {idx + 1}
-                      </span>
-
+                      <span className={`w-7 h-7 rounded-lg text-xs font-mono font-bold flex items-center justify-center shrink-0 shadow-sm ${isFinal ? 'bg-amber-400 text-slate-950' : 'bg-purple-600 text-white'}`}>{idx + 1}</span>
                       {editingStageIndex === idx ? (
-                        <input
-                          autoFocus
-                          type="text"
-                          value={stage.name}
-                          onChange={(e) => handleUpdateStageField(idx, 'name', e.target.value)}
-                          onBlur={() => setEditingStageIndex(null)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === 'Escape') {
-                              setEditingStageIndex(null);
-                            }
-                          }}
-                          placeholder={`阶段 ${idx + 1} 名称`}
-                          className="w-full px-2.5 py-1 rounded-lg bg-slate-950 border border-purple-500 text-slate-100 font-black text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 transition-all placeholder:text-slate-600"
-                        />
+                        <input autoFocus type="text" value={stage.name} onChange={(e) => handleUpdateStageField(idx, 'name', e.target.value)} onBlur={() => setEditingStageIndex(null)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingStageIndex(null); }} className="w-full px-2.5 py-1 rounded-lg bg-slate-950 border border-purple-500 text-slate-100 font-black text-sm focus:outline-none focus:ring-1 focus:ring-purple-500" />
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => setEditingStageIndex(idx)}
-                          className="group flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-800/80 border border-transparent hover:border-slate-700/60 transition-all text-left"
-                          title="点击修改赛段名称"
-                        >
-                          <span className="font-black text-sm text-slate-100 group-hover:text-purple-300 transition-colors">
-                            {stage.name || `阶段 ${idx + 1}`}
-                          </span>
-                          <Pencil className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 group-hover:text-purple-400 transition-all shrink-0" />
+                        <button type="button" onClick={() => setEditingStageIndex(idx)} className="group flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-slate-800/80 transition-all text-left">
+                          <span className="font-black text-sm text-slate-100 group-hover:text-purple-300">{stage.name || `阶段 ${idx + 1}`}</span>
+                          <Pencil className="w-3.5 h-3.5 text-slate-500 opacity-0 group-hover:opacity-100 transition-all" />
                         </button>
                       )}
                     </div>
-
-                    {/* Right: Aligned Inherit Score & Score Rules Buttons + Status Badges (Fixed-Slot Columns) */}
                     <div className="flex items-center gap-2 ml-auto shrink-0">
                       {!isFinal ? (
                         <>
-                          {/* Slot 1 (Left): 底分继承切换组 或 首赛段等宽占位 (固定宽 136px) */}
-                          <div className="w-[136px] shrink-0">
+                          {/* Slot 1: 底分继承 */}
+                          <div className="w-[120px] shrink-0">
                             {idx > 0 ? (
                               <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-700/80 text-[11px] font-mono w-full">
-                                <div className="relative group flex-1">
-                                  <button
-                                    type="button"
-                                    disabled={disableRules}
-                                    onClick={() => handleUpdateStageField(idx, 'inheritScores', 0)}
-                                    className={`w-full py-0.5 rounded-md font-bold transition-all text-center ${
-                                      stage.inheritScores === 0
-                                        ? 'bg-slate-700 text-white shadow-sm'
-                                        : 'text-slate-400 hover:text-slate-200'
-                                    } ${disableRules ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                  >
-                                    清零起跑
-                                  </button>
-                                  {/* Tooltip */}
-                                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:flex flex-col items-center z-40 pointer-events-none whitespace-nowrap">
-                                    <div className="bg-slate-900 border border-slate-700 text-slate-100 text-[11px] px-3 py-2 rounded-xl shadow-2xl shadow-black/90 font-mono text-center">
-                                      <div className="text-slate-300 font-extrabold mb-0.5">清零重新起跑 (0 底分)</div>
-                                      <div className="text-slate-400 text-[10px]">所有晋级选手在本赛段积分从 0 开始重新计算</div>
-                                    </div>
-                                    <div className="w-2.5 h-2.5 bg-slate-900 border-r border-b border-slate-700 transform rotate-45 -mt-1.5" />
-                                  </div>
-                                </div>
-
-                                <div className="relative group flex-1">
-                                  <button
-                                    type="button"
-                                    disabled={disableRules}
-                                    onClick={() => handleUpdateStageField(idx, 'inheritScores', 1)}
-                                    className={`w-full py-0.5 rounded-md font-bold transition-all text-center ${
-                                      stage.inheritScores === 1
-                                        ? 'bg-indigo-600 text-white shadow-sm'
-                                        : 'text-slate-400 hover:text-slate-200'
-                                    } ${disableRules ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                  >
-                                    继承底分
-                                  </button>
-                                  {/* Tooltip */}
-                                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:flex flex-col items-center z-40 pointer-events-none whitespace-nowrap">
-                                    <div className="bg-slate-900 border border-indigo-500/50 text-slate-100 text-[11px] px-3 py-2 rounded-xl shadow-2xl shadow-black/90 font-mono text-center">
-                                      <div className="text-indigo-300 font-extrabold mb-0.5">继承上一轮累积分数</div>
-                                      <div className="text-slate-300 text-[10px]">选手将携带上一赛段的总分作为初始底分继续累加</div>
-                                    </div>
-                                    <div className="w-2.5 h-2.5 bg-slate-900 border-r border-b border-indigo-500/50 transform rotate-45 -mt-1.5" />
-                                  </div>
-                                </div>
+                                <button
+                                  type="button"
+                                  disabled={disableRules}
+                                  onClick={() => handleUpdateStageField(idx, 'inheritScores', 0)}
+                                  className={`flex-1 py-0.5 rounded-md font-bold transition-all text-center ${
+                                    stage.inheritScores === 0 ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                                  } ${disableRules ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                >
+                                  清零
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={disableRules}
+                                  onClick={() => handleUpdateStageField(idx, 'inheritScores', 1)}
+                                  className={`flex-1 py-0.5 rounded-md font-bold transition-all text-center ${
+                                    stage.inheritScores === 1 ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                                  } ${disableRules ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                >
+                                  继承
+                                </button>
                               </div>
                             ) : (
-                              /* 首赛段隐形占位块，确保右侧积分规则完全对齐 */
-                              <div className="w-full hidden sm:block" />
+                              <div className="px-2 py-0.5 rounded-lg bg-slate-950/60 border border-slate-800 text-[10px] text-slate-400 font-mono text-center flex items-center justify-center gap-1 h-[26px]">
+                                首赛段
+                              </div>
                             )}
                           </div>
 
-                          {/* Slot 2 (Right): 积分规则切换组 (固定宽 136px) */}
-                          <div className="w-[136px] shrink-0">
+                          {/* Slot 2: 积分规则 */}
+                          <div className="w-[128px] shrink-0">
                             <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-700/80 text-[11px] font-mono w-full">
-                              <div className="relative group flex-1">
-                                <button
-                                  type="button"
-                                  disabled={disableRules}
-                                  onClick={() => handleUpdateStageField(idx, 'scoreRuleId', '1')}
-                                  className={`w-full py-0.5 rounded-md font-bold transition-all text-center ${
-                                    ruleId === '1'
-                                      ? 'bg-purple-600 text-white shadow-sm'
-                                      : 'text-slate-400 hover:text-slate-200'
-                                  } ${disableRules ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                >
-                                  8分标准
-                                </button>
-                                {/* Tooltip */}
-                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:flex flex-col items-center z-40 pointer-events-none whitespace-nowrap">
-                                  <div className="bg-slate-900 border border-purple-500/50 text-slate-100 text-[11px] px-3 py-2 rounded-xl shadow-2xl shadow-black/90 font-mono text-center">
-                                    <div className="text-purple-300 font-extrabold mb-1">官方标准积分 (8-7-6-5-4-3-2-1)</div>
-                                    <div className="text-slate-300 text-[10px] space-x-1">
-                                      <span>第1~8名:</span>
-                                      <span className="text-amber-300 font-bold">8分</span>,
-                                      <span className="text-slate-300">7分</span>,
-                                      <span className="text-slate-300">6分</span>,
-                                      <span className="text-slate-300">5分</span>,
-                                      <span className="text-slate-300">4分</span>,
-                                      <span className="text-slate-300">3分</span>,
-                                      <span className="text-slate-300">2分</span>,
-                                      <span className="text-slate-300">1分</span>
-                                    </div>
-                                  </div>
-                                  <div className="w-2.5 h-2.5 bg-slate-900 border-r border-b border-purple-500/50 transform rotate-45 -mt-1.5" />
-                                </div>
-                              </div>
-
-                              <div className="relative group flex-1">
-                                <button
-                                  type="button"
-                                  disabled={disableRules}
-                                  onClick={() => handleUpdateStageField(idx, 'scoreRuleId', '2')}
-                                  className={`w-full py-0.5 rounded-md font-bold transition-all text-center ${
-                                    ruleId === '2'
-                                      ? 'bg-amber-500 text-slate-950 shadow-sm font-black'
-                                      : 'text-slate-400 hover:text-slate-200'
-                                  } ${disableRules ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                >
-                                  9分加权
-                                </button>
-                                {/* Tooltip */}
-                                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:flex flex-col items-center z-40 pointer-events-none whitespace-nowrap">
-                                  <div className="bg-slate-900 border border-amber-500/50 text-slate-100 text-[11px] px-3 py-2 rounded-xl shadow-2xl shadow-black/90 font-mono text-center">
-                                    <div className="text-amber-300 font-extrabold mb-1">吃鸡加权积分 (9-7-6-5-4-3-2-1)</div>
-                                    <div className="text-slate-300 text-[10px] space-x-1">
-                                      <span>第1~8名:</span>
-                                      <span className="text-amber-400 font-black">9分 (+1)</span>,
-                                      <span className="text-slate-300">7分</span>,
-                                      <span className="text-slate-300">6分</span>,
-                                      <span className="text-slate-300">5分</span>,
-                                      <span className="text-slate-300">4分</span>,
-                                      <span className="text-slate-300">3分</span>,
-                                      <span className="text-slate-300">2分</span>,
-                                      <span className="text-slate-300">1分</span>
-                                    </div>
-                                  </div>
-                                  <div className="w-2.5 h-2.5 bg-slate-900 border-r border-b border-amber-500/50 transform rotate-45 -mt-1.5" />
-                                </div>
-                              </div>
+                              <button
+                                type="button"
+                                disabled={disableRules}
+                                onClick={() => handleUpdateStageField(idx, 'scoreRuleId', '1')}
+                                className={`flex-1 py-0.5 rounded-md font-bold transition-all text-center ${
+                                  ruleId === '1' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                                } ${disableRules ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                title="8分标准制：8-7-6-5-4-3-2-1"
+                              >
+                                8分制
+                              </button>
+                              <button
+                                type="button"
+                                disabled={disableRules}
+                                onClick={() => handleUpdateStageField(idx, 'scoreRuleId', '2')}
+                                className={`flex-1 py-0.5 rounded-md font-bold transition-all text-center ${
+                                  ruleId === '2' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+                                } ${disableRules ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                title="9分加权制：9-7-6-5-4-3-2-1"
+                              >
+                                9分制
+                              </button>
                             </div>
                           </div>
                         </>
                       ) : (
-                        /* 决赛黄金登顶徽章 (跨越两栏 136 + 136 + 8 = 280px) */
-                        <div className="w-[280px] shrink-0 flex justify-end">
+                        /* 决赛黄金登顶徽章 */
+                        <div className="w-[256px] shrink-0 flex justify-end">
                           <span className="w-full justify-center px-3 py-1 rounded-lg bg-amber-400/20 text-amber-300 text-[11px] font-black flex items-center gap-1.5 border border-amber-400/40 shadow-sm">
                             <Crown className="w-3.5 h-3.5 text-amber-400" />
                             <span>20分登顶总决赛 (8分标准)</span>
@@ -436,7 +308,7 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                         </div>
                       )}
 
-                      {/* Slot 3: 状态/锁定徽章区 (固定宽度 84px) */}
+                      {/* Slot 3: 状态/锁定徽章区 */}
                       <div className="shrink-0 flex justify-end">
                         {disableRules ? (
                           <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] flex items-center gap-1 border border-slate-700">
@@ -582,6 +454,7 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

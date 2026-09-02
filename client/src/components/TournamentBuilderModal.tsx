@@ -284,7 +284,7 @@ export const TournamentBuilderModal: React.FC<TournamentBuilderModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fade-in">
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-fade-in">
       <div className="relative w-full max-w-4xl bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl shadow-purple-950/50 p-6 space-y-6 my-6 max-h-[92vh] overflow-y-auto custom-scrollbar">
         {/* 1. Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
