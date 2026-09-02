@@ -202,10 +202,10 @@ export const TournamentEditModal: React.FC<TournamentEditModalProps> = ({
                   <span>参赛总规模 (已锁定)</span>
                 </label>
                 <span className="text-[10px] font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 shrink-0">
-                  {tournament.totalPlayers} 人 ({tournament.totalPlayers / 8} 房)
+                  {tournament.totalPlayers} 人
                 </span>
               </div>
-              <input type="text" disabled value={`${tournament.totalPlayers} 人 (${tournament.totalPlayers / 8} 个独立 8 人房间)`} className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-500 text-sm cursor-not-allowed font-mono h-[38px]" />
+              <input type="text" disabled value={`${tournament.totalPlayers} 人`} className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-500 text-sm cursor-not-allowed font-mono h-[38px]" />
             </div>
           </div>
         </div>

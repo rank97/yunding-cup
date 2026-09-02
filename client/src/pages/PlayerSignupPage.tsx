@@ -239,20 +239,20 @@ export const PlayerSignupPage: React.FC<PlayerSignupPageProps> = ({
         </div>
 
         {/* Hero Tournament Card */}
-        <div className="relative overflow-hidden rounded-3xl glass-panel border-purple-500/30 p-6 md:p-8 shadow-2xl bg-gradient-to-br from-[#0e122b]/90 via-[#0a0d20]/80 to-[#070914]/90">
+        <div className="relative overflow-hidden rounded-3xl glass-panel border-purple-500/30 p-4 sm:p-6 md:p-8 shadow-2xl bg-gradient-to-br from-[#0e122b]/90 via-[#0a0d20]/80 to-[#070914]/90">
           <div className="relative z-10 space-y-4">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-mono font-black bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center gap-1.5 shadow-sm">
-                <Flame className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-3 py-1 rounded-xl text-xs sm:text-sm font-mono font-black bg-amber-400/20 text-amber-300 border border-amber-400/40 flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
                 <span>官方赛事报名通道</span>
               </span>
-              <span className="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-mono font-bold bg-slate-800/90 text-slate-300 border border-slate-700/80">
-                总席位: {totalPlayers} 人 ({totalPlayers / 8} 房)
+              <span className="px-3 py-1 rounded-xl text-xs sm:text-sm font-mono font-bold bg-slate-800/90 text-slate-300 border border-slate-700/80 whitespace-nowrap">
+                总席位: {totalPlayers} 人
               </span>
             </div>
 
             <div>
-              <h1 className="text-2xl md:text-3xl font-black text-slate-100 tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-100 tracking-tight break-words">
                 {tournament.title}
               </h1>
             </div>
@@ -294,38 +294,37 @@ export const PlayerSignupPage: React.FC<PlayerSignupPageProps> = ({
               </div>
             )}
 
-            {/* Registration Progress Bar */}
-            <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/90 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-purple-400" />
-                  <span className="text-slate-200">
-                    报名进度：<span className="font-mono text-purple-400 font-extrabold text-sm">{registeredCount}</span> / {totalPlayers} 人
-                  </span>
-                  {isOpen ? (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                      开放报名中 · 剩余 {remainingSlots} 个席位
-                    </span>
-                  ) : isFull ? (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                      名额已满
-                    </span>
-                  ) : (
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
-                      报名已截止
-                    </span>
-                  )}
+            {/* Registration Progress Bar - Fully Responsive */}
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
+                <div className="flex items-center gap-1.5 text-slate-200">
+                  <Users className="w-4 h-4 text-purple-400 shrink-0" />
+                  <span>报名进度：</span>
+                  <span className="font-mono text-purple-400 font-black text-sm">{registeredCount}</span>
+                  <span className="text-slate-400 font-mono">/ {totalPlayers} 人</span>
                 </div>
-                <span className="font-mono text-purple-300 text-xs">{progressPercent}%</span>
+                {isOpen ? (
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 whitespace-nowrap font-medium">
+                    开放报名中 · 剩余 {remainingSlots} 席
+                  </span>
+                ) : isFull ? (
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 whitespace-nowrap font-medium">
+                    名额已满
+                  </span>
+                ) : (
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 whitespace-nowrap font-medium">
+                    报名已截止
+                  </span>
+                )}
               </div>
 
               {/* Progress Bar */}
-              <div className="h-2.5 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800/80 p-[1px]">
+              <div className="h-2.5 sm:h-3 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800 p-[1px]">
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${
+                  className={`h-full rounded-full transition-all duration-500 shadow-sm ${
                     isFull
                       ? 'bg-gradient-to-r from-purple-500 via-rose-500 to-amber-500'
-                      : 'bg-gradient-to-r from-purple-600 to-amber-400'
+                      : 'bg-gradient-to-r from-purple-600 via-indigo-500 to-amber-400'
                   }`}
                   style={{ width: `${progressPercent}%` }}
                 />

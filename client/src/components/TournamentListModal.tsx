@@ -219,7 +219,7 @@ export const TournamentListModal: React.FC<TournamentListModalProps> = ({
                     <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-400">
                       <span className="text-amber-300 font-bold flex items-center gap-1">
                         <Layers className="w-3.5 h-3.5 text-amber-400" />
-                        {t.totalPlayers} 人赛规 ({t.totalPlayers / 8} 房间)
+                        {t.totalPlayers} 人赛规
                       </span>
                       <span className="text-slate-500">|</span>
                       <span className="flex items-center gap-1 text-slate-300">

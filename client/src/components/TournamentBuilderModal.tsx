@@ -351,7 +351,7 @@ export const TournamentBuilderModal: React.FC<TournamentBuilderModalProps> = ({
                   </div>
 
                   <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                    <span>{preset.totalPlayers} 人 ({preset.totalPlayers / 8} 房间)</span>
+                    <span>{preset.totalPlayers} 人</span>
                     <span className="text-purple-300 font-bold">{preset.stages.length} 个赛段</span>
                   </div>
                 </button>
@@ -388,7 +388,7 @@ export const TournamentBuilderModal: React.FC<TournamentBuilderModalProps> = ({
                   <span className="text-rose-400">*</span>
                 </label>
                 <span className="text-[10px] font-mono text-purple-300 font-bold bg-purple-950/60 px-1.5 py-0.5 rounded border border-purple-500/30 shrink-0">
-                  {totalPlayers} 人 ({totalPlayers / 8} 房)
+                  {totalPlayers} 人
                 </span>
               </div>
 
@@ -401,16 +401,13 @@ export const TournamentBuilderModal: React.FC<TournamentBuilderModalProps> = ({
                       key={num}
                       type="button"
                       onClick={() => setTotalPlayers(num)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all shrink-0 flex items-center gap-1 ${
+                      className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all shrink-0 flex items-center justify-center ${
                         isActive
                           ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm shadow-purple-900/50 ring-1 ring-purple-400/80'
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
                       }`}
                     >
                       <span>{num}人</span>
-                      <span className={`text-[9px] ${isActive ? 'text-purple-200' : 'text-slate-500'}`}>
-                        ({num / 8}房)
-                      </span>
                     </button>
                   );
                 })}
