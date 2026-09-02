@@ -53,11 +53,16 @@
 - **严格的状态流转安全防御**：
   - 赛段锁定与解锁机制：下游赛段存在分组或积分时严禁解锁当前赛段。
   - 名册锁定与单选手内联编辑。
+- **选手在线自主报名与群发分享体系**：
+  - 专属免密报名通道：选手打开链接即可填写昵称与游戏 ID 自助报名，满员实时拦截并展示花名册。
+  - 一体化比赛宣发：后台一键复制包含「选手报名链接」与「观赛大屏链接」的格式化精美宣发文案。
+  - 选手头像定制：提供 12 套动漫风格预设头像库，支持单选手微调与一键随机换头像。
 - **电竞级暗夜视觉 UI (Cyber Esports)**：
   - 观众大屏免登录沉浸式观赛，赛点火焰微动效与登顶吃鸡图标分列严格纵向贯穿对齐。
   - 统一电竞主题毛玻璃弹窗与 Toast 通知体系，告别原生浏览器的生硬提示。
+  - 采用 React Portal 全局挂载与多层叠图层隔离，彻底消除弹窗透光与层级遮挡问题。
   - 实时 SSE 毫秒级推流同步（含 15 秒定时心跳保活与翡翠绿 LIVE 在线监测）。
-  - **极致极简 URL 体系**：自动省略 `view=admin`、`tab=details`、`stage=1`，仅保留分享短码（如 `/?share=ZZM27GV5`）。
+  - **极致极简 URL 体系**：自动省略 `view=admin`、`tab=details`、`stage=1`，仅保留分享短码（如 `/?v=WW4U9JCU`）。
 
 ---
 
@@ -140,7 +145,7 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/app/data --name tft-tourneyos ghcr.io
 
 - **超级管理员**：`admin` / `123456`
 - **普通主办方**：`user` / `123456`
-- **游客观众**：无需登录即可通过分享链接或公开大屏查看比赛！
+- **参赛选手 / 游客观众**：无需登录即可通过报名链接自主报名或通过大屏链接实时观战！
 
 ---
 
@@ -168,8 +173,11 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/app/data --name tft-tourneyos ghcr.io
 | 方法 | 路径 | 权限 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/tournaments/{tId}/players` | 需登录 | 获取赛事名册选手列表 |
-| `POST` | `/api/v1/tournaments/{tId}/players/import` | 需登录 | 批量导入选手名册 |
-| `PUT` | `/api/v1/players/{pId}` | 需登录 | 更新单个选手的姓名与游戏 ID |
+| `POST` | `/api/v1/tournaments/{tId}/players/batch` | 需登录 | 批量导入选手名册 |
+| `POST` | `/api/v1/tournaments/{tId}/players` | 需登录 | 单独录入参赛选手（支持头像） |
+| `PUT` | `/api/v1/players/{pId}` | 需登录 | 更新单个选手的姓名、游戏 ID 或自定义头像 |
+| `DELETE` | `/api/v1/players/{pId}` | 需登录 | 删除指定选手 |
+| `GET` | `/api/v1/stages/{sId}` | 需登录 | 获取赛段分组及房间小局明细 |
 | `POST` | `/api/v1/stages/{sId}/grouping` | 需登录 | 赛段一键分组（`mode=SNAKE` / `RANDOM`） |
 | `POST` | `/api/v1/stages/{sId}/clear-grouping` | 需登录 | 清除赛段分组房间（有比分时防误触拦截） |
 | `POST` | `/api/v1/stages/{sId}/swap-players` | 需登录 | 跨组/组内两名选手席位微调互换 |
@@ -185,10 +193,13 @@ docker run -d -p 8080:8080 -v $(pwd)/data:/app/data --name tft-tourneyos ghcr.io
 | `POST` | `/api/v1/match-rounds/{rId}/records` | 需登录 | 录入小局成绩（1~8名自动换算8~1分，决出冠军自动结赛） |
 | `POST` | `/api/v1/match-rounds/{rId}/reset` | 需登录 | 重置小局比分（作废重赛） |
 
-### 5. 公开观赛与大屏实时推流接口 (`/api/v1/public`)
+### 5. 公开报名、观赛与大屏推流接口 (`/api/v1/public`)
 | 方法 | 路径 | 权限 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/public/tournaments` | 公开 | 获取公开赛事大厅列表 |
+| `GET` | `/api/v1/public/score-rules` | 公开 | 查询系统中所有可用的积分规则模板列表 |
+| `GET` | `/api/v1/public/tournaments/{shareCode}/signup-info` | 公开 | 获取指定赛事的公开报名概况与选手花名册 |
+| `POST` | `/api/v1/public/tournaments/{shareCode}/signup` | 公开 | 选手自主在线公开免密报名参赛（支持头像） |
 | `GET` | `/api/v1/public/tournaments/{shareCode}/overview` | 公开 | 获取大盘全景动态流程图谱与冠军王座 |
 | `GET` | `/api/v1/public/tournaments/{shareCode}/stages/{sId}/leaderboard` | 公开 | 获取指定赛段积分榜明细 |
 | `GET` | `/api/v1/public/tournaments/{shareCode}/stages/{sId}/group-details` | 公开 | 获取指定赛段各组战报矩阵 |
