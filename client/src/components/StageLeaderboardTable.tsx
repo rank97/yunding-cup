@@ -401,7 +401,7 @@ export const StageLeaderboardTable: React.FC<StageLeaderboardTableProps> = ({
                       isChampion
                         ? 'bg-amber-500/15 font-semibold text-amber-100'
                         : isMatchPoint
-                        ? 'bg-rose-500/10'
+                        ? 'bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-orange-500/15 border-y border-orange-500/30'
                         : isTop1
                         ? 'bg-amber-500/5'
                         : idx % 2 === 0
@@ -429,26 +429,26 @@ export const StageLeaderboardTable: React.FC<StageLeaderboardTableProps> = ({
                     </td>
 
                     {/* Name & Avatar */}
-                    <td className="py-3 px-4 font-bold text-slate-100">
-                      <div className="flex items-center gap-2.5">
+                    <td className="py-3.5 px-4 font-bold text-slate-100">
+                      <div className="flex items-center gap-3">
                         {row.avatarUrl ? (
                           <img
                             src={row.avatarUrl}
                             alt=""
-                            className="w-6 h-6 rounded-full object-cover border border-slate-700 bg-slate-900 shrink-0"
+                            className="w-9 h-9 rounded-xl object-cover border border-slate-700 bg-slate-900 shrink-0 shadow-sm"
                           />
                         ) : (
-                          <div className="w-6 h-6 rounded-full bg-purple-950/80 border border-purple-700/60 flex items-center justify-center text-[10px] text-purple-300 font-bold shrink-0">
+                          <div className="w-9 h-9 rounded-xl bg-purple-950/80 border border-purple-700/60 flex items-center justify-center text-xs text-purple-300 font-bold shrink-0">
                             {row.name.charAt(0)}
                           </div>
                         )}
-                        <span>{row.name}</span>
+                        <span className="text-base font-extrabold text-slate-100 tracking-wide">{row.name}</span>
                         {isMatchPoint && (
                           <span 
-                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-600/90 text-rose-100 text-[10px] font-mono font-black border border-rose-400/40 shadow-sm shadow-rose-600/40 shrink-0"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-600/90 text-rose-100 text-xs font-mono font-black border border-rose-400/40 shadow-sm shadow-rose-600/40 shrink-0"
                             title="已达 20 分开启赛点，下局吃鸡即可夺冠！"
                           >
-                            <Flame className="w-3 h-3 text-amber-300 animate-pulse shrink-0" />
+                            <Flame className="w-3.5 h-3.5 text-amber-300 animate-pulse shrink-0" />
                             <span>赛点</span>
                           </span>
                         )}
@@ -456,7 +456,7 @@ export const StageLeaderboardTable: React.FC<StageLeaderboardTableProps> = ({
                     </td>
 
                     {/* Game ID */}
-                    <td className="py-3 px-4 font-mono text-xs text-slate-400">
+                    <td className="py-3.5 px-4 font-mono text-sm font-semibold text-slate-200">
                       {row.gameId || '-'}
                     </td>
 

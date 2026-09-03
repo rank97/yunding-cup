@@ -10,7 +10,7 @@ import {
 import { DynamicMindMap } from '../components/DynamicMindMap';
 import { StageLeaderboardTable } from '../components/StageLeaderboardTable';
 import { GroupRoundCards } from '../components/GroupRoundCards';
-import { LayoutGrid, TableProperties, Sparkles, RefreshCw, Zap } from 'lucide-react';
+import { LayoutGrid, TableProperties, Sparkles, RefreshCw, Zap, Maximize, Minimize } from 'lucide-react';
 
 import { getUrlNavState, updateUrlNavState } from '../services/urlState';
 
@@ -25,6 +25,25 @@ export const SpectatorDashboard: React.FC<SpectatorDashboardProps> = ({ shareCod
   const [leaderboard, setLeaderboard] = useState<StageLeaderboard | null>(null);
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+      setIsFullscreen(false);
+    }
+  };
 
   // 载入大盘全景数据（策略 A：智能聚焦当前比赛赛段）
   const fetchOverview = useCallback(async () => {
@@ -141,10 +160,10 @@ export const SpectatorDashboard: React.FC<SpectatorDashboardProps> = ({ shareCod
   }
 
   return (
-    <div className="max-w-[1700px] mx-auto px-4 py-6 space-y-6">
-      {/* View Switcher Sub-Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800">
+    <div className="w-full max-w-[2560px] 2xl:max-w-[3200px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 min-h-[calc(100vh-4rem)] flex flex-col">
+      {/* View Switcher Sub-Header & Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-slate-800 shadow-sm">
           <button
             onClick={() => setActiveTab('mindmap')}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -166,6 +185,27 @@ export const SpectatorDashboard: React.FC<SpectatorDashboardProps> = ({ shareCod
           >
             <TableProperties className="w-4 h-4" />
             <span>阶段排行榜与战报</span>
+          </button>
+        </div>
+
+        {/* Right: Fullscreen Esports Broadcast Toggle */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleFullscreen}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 transition-all shadow-sm hover:border-purple-500/50"
+            title="开启/退出浏览器全屏沉浸大屏转播模式"
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize className="w-3.5 h-3.5 text-amber-400" />
+                <span>退出全屏</span>
+              </>
+            ) : (
+              <>
+                <Maximize className="w-3.5 h-3.5 text-purple-400" />
+                <span>全屏大屏模式</span>
+              </>
+            )}
           </button>
         </div>
       </div>

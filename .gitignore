@@ -20,6 +20,7 @@ package-lock.json
 
 # Backend (Java / Maven)
 server/target/
+server/src/main/resources/static/
 *.class
 *.jar
 *.war

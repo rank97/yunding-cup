@@ -106,7 +106,7 @@ export const GroupRoundCards: React.FC<GroupRoundCardsProps> = ({
                           return (
                             <React.Fragment key={item.playerId || idx}>
                               <div
-                                className={`px-2.5 py-1 rounded-lg text-xs flex items-center justify-between transition-all ${
+                                className={`px-3 py-1.5 rounded-lg text-xs flex items-center justify-between transition-all ${
                                   isFirst
                                     ? 'bg-amber-500/20 border border-amber-500/40 text-amber-200 font-bold shadow-sm'
                                     : isTop4
@@ -114,18 +114,30 @@ export const GroupRoundCards: React.FC<GroupRoundCardsProps> = ({
                                     : 'text-slate-400 hover:text-slate-300'
                                 }`}
                               >
-                                <div className="flex items-center gap-2 truncate">
-                                  <span className={`w-4 font-mono font-bold text-[11px] ${isFirst ? 'text-amber-400' : isTop4 ? 'text-cyan-400' : 'text-slate-500'}`}>
+                                <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                                  <span className={`w-4 font-mono font-bold text-xs shrink-0 ${isFirst ? 'text-amber-400' : isTop4 ? 'text-cyan-400' : 'text-slate-500'}`}>
                                     {item.rank}
                                   </span>
-                                  <span className="truncate max-w-[120px]" title={item.name}>
+                                  {item.avatarUrl && (
+                                    <img
+                                      src={item.avatarUrl}
+                                      alt=""
+                                      className="w-5 h-5 rounded-md object-cover border border-slate-700 bg-slate-950 shrink-0"
+                                    />
+                                  )}
+                                  <span className="font-bold text-sm text-slate-100 truncate" title={item.name}>
                                     {item.name}
                                   </span>
+                                  {item.gameId && (
+                                    <span className="text-xs font-mono text-slate-400 truncate" title={item.gameId}>
+                                      ({item.gameId})
+                                    </span>
+                                  )}
                                   {isFirst && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                                 </div>
 
-                                <div className="flex items-center gap-2 font-mono">
-                                  <span className={`font-bold ${isFirst ? 'text-amber-300' : isTop4 ? 'text-cyan-300' : 'text-slate-400'}`}>
+                                <div className="flex items-center gap-2 font-mono shrink-0">
+                                  <span className={`font-bold text-sm ${isFirst ? 'text-amber-300' : isTop4 ? 'text-cyan-300' : 'text-slate-400'}`}>
                                     {item.score}分
                                   </span>
                                 </div>

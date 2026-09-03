@@ -59,18 +59,18 @@ public class StageServiceImpl implements StageService {
     }
 
     private static final String[] PRESET_AVATARS = {
-            "https://api.dicebear.com/7.x/adventurer/svg?seed=PenguKnight&backgroundColor=b6e3f4",
-            "https://api.dicebear.com/7.x/adventurer/svg?seed=ChibiYasuo&backgroundColor=ffdfbf",
-            "https://api.dicebear.com/7.x/lorelei/svg?seed=StarGuardianAhri&backgroundColor=ffd5dc",
-            "https://api.dicebear.com/7.x/bottts/svg?seed=ProjectMecha&backgroundColor=c0aede",
-            "https://api.dicebear.com/7.x/bottts/svg?seed=CyberAgent&backgroundColor=b6e3f4",
-            "https://api.dicebear.com/7.x/lorelei/svg?seed=MoonSorceress&backgroundColor=d1d4f9",
-            "https://api.dicebear.com/7.x/adventurer/svg?seed=DragonLord&backgroundColor=ffdfbf",
-            "https://api.dicebear.com/7.x/adventurer/svg?seed=ShadowNinja&backgroundColor=c0aede",
-            "https://api.dicebear.com/7.x/pixel-art/svg?seed=PixelMage&backgroundColor=b6e3f4",
-            "https://api.dicebear.com/7.x/pixel-art/svg?seed=PixelHero&backgroundColor=ffd5dc",
+            "https://api.dicebear.com/7.x/avataaars/svg?seed=HappyPengu&mouth=smile&eyes=happy&backgroundColor=b6e3f4",
+            "https://api.dicebear.com/7.x/avataaars/svg?seed=ChonccJoy&mouth=twinkle&eyes=wink&backgroundColor=ffdfbf",
+            "https://api.dicebear.com/7.x/avataaars/svg?seed=StarAhri&mouth=smile&eyes=happy&backgroundColor=ffd5dc",
+            "https://api.dicebear.com/7.x/avataaars/svg?seed=GoldenVictory&mouth=smile&eyes=wink&backgroundColor=c0aede",
+            "https://api.dicebear.com/7.x/big-smile/svg?seed=SunnyChampion&backgroundColor=ffd5dc",
+            "https://api.dicebear.com/7.x/big-smile/svg?seed=LuckyHero&backgroundColor=b6e3f4",
+            "https://api.dicebear.com/7.x/big-smile/svg?seed=JoyfulSpark&backgroundColor=d1d4f9",
+            "https://api.dicebear.com/7.x/big-smile/svg?seed=HappyGamer&backgroundColor=ffdfbf",
             "https://api.dicebear.com/7.x/fun-emoji/svg?seed=CuteDango&backgroundColor=ffd5dc",
-            "https://api.dicebear.com/7.x/fun-emoji/svg?seed=FuryHorn&backgroundColor=b6e3f4"
+            "https://api.dicebear.com/7.x/fun-emoji/svg?seed=CheeringHorn&backgroundColor=b6e3f4",
+            "https://api.dicebear.com/7.x/fun-emoji/svg?seed=LuckyStar&backgroundColor=c0aede",
+            "https://api.dicebear.com/7.x/fun-emoji/svg?seed=SweetSmile&backgroundColor=ffdfbf"
     };
 
     private String getAutoAvatar(String name, int index) {

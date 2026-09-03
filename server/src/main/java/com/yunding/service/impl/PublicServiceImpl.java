@@ -137,6 +137,34 @@ public class PublicServiceImpl implements PublicService {
                         }
                         slots.add(slot);
                     }
+
+                    // 组内选手按战绩与积分严格降序排序 (总冠军优先 > 积分降序 > 吃鸡数降序 > 前四数降序 > 种子席位升序)
+                    slots.sort((a, b) -> {
+                        if (Boolean.TRUE.equals(a.getIsPlaceholder())) return 1;
+                        if (Boolean.TRUE.equals(b.getIsPlaceholder())) return -1;
+
+                        boolean aChamp = Constants.ADVANCE_CHAMPION.equals(a.getAdvancementStatus());
+                        boolean bChamp = Constants.ADVANCE_CHAMPION.equals(b.getAdvancementStatus());
+                        if (aChamp && !bChamp) return -1;
+                        if (!aChamp && bChamp) return 1;
+
+                        int scoreA = a.getCurrentScore() != null ? a.getCurrentScore() : 0;
+                        int scoreB = b.getCurrentScore() != null ? b.getCurrentScore() : 0;
+                        if (scoreA != scoreB) return Integer.compare(scoreB, scoreA);
+
+                        int fpA = a.getFirstPlaces() != null ? a.getFirstPlaces() : 0;
+                        int fpB = b.getFirstPlaces() != null ? b.getFirstPlaces() : 0;
+                        if (fpA != fpB) return Integer.compare(fpB, fpA);
+
+                        int topA = a.getTop4s() != null ? a.getTop4s() : 0;
+                        int topB = b.getTop4s() != null ? b.getTop4s() : 0;
+                        if (topA != topB) return Integer.compare(topB, topA);
+
+                        int seedA = a.getSeedIndex() != null ? a.getSeedIndex() : 999;
+                        int seedB = b.getSeedIndex() != null ? b.getSeedIndex() : 999;
+                        return Integer.compare(seedA, seedB);
+                    });
+
                     gNode.setSlots(slots);
                     groupNodes.add(gNode);
                 }
